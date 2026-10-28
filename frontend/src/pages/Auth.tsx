@@ -119,7 +119,7 @@ function Auth() {
 
               <a
                 href={api.url('/api/oidc/login')}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3.5 font-semibold text-white transition hover:bg-primary-dark"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3.5 font-semibold text-on-primary transition hover:bg-primary-dark"
               >
                 <FaArrowUpRightFromSquare size={14} />
                 {t('auth.signInWith', { provider: oidcConfig.display_name })}
@@ -234,7 +234,7 @@ function Auth() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="mt-6 w-full rounded-xl bg-primary px-5 py-3.5 font-semibold text-white transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-6 w-full rounded-xl bg-primary px-5 py-3.5 font-semibold text-on-primary transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {submitting ? t('auth.working') : requiresSetup ? t('auth.createAdminAccount') : t('auth.signIn')}
               </button>

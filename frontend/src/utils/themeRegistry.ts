@@ -55,6 +55,7 @@ export interface BuiltinThemeMeta {
 }
 
 export const BUILTIN_THEMES: BuiltinThemeMeta[] = [
+  { key: 'studio',     label: 'Studio',     swatch: ['#c6f24e', '#0d0e10'] },
   { key: 'rubedo',     label: 'Rubedo',     swatch: ['#ef4444', '#171e2f'] },
   { key: 'citrinitas', label: 'Citrinitas', swatch: ['#fbbf24', '#140d2d'] },
   { key: 'viriditas',  label: 'Viriditas',  swatch: ['#16a34a', '#000000'] },
@@ -72,7 +73,7 @@ export const BUILTIN_THEME_KEYS: ReadonlySet<string> = new Set(
 export const STYLE_ELEMENT_ID = 'transmute-custom-themes'
 export const REGISTRY_CACHE_KEY = 'transmute-theme-registry'
 export const THEME_STORAGE_KEY = 'transmute-theme'
-export const FALLBACK_THEME = 'rubedo'
+export const FALLBACK_THEME = 'studio'
 
 /** Convert "#rrggbb" (or "#rgb") to "r g b" decimal channel string. */
 export function hexToRgbChannels(hex: string): string {

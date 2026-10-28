@@ -127,7 +127,7 @@ def test_update_unknown_theme_raises(tmp_settings_db):
         tmp_settings_db.update_custom_theme("ghost", name="Nope")
 
 
-def test_delete_custom_theme_resets_users_to_rubedo(tmp_settings_db):
+def test_delete_custom_theme_resets_users_to_default_theme(tmp_settings_db):
     created = tmp_settings_db.create_custom_theme("Doomed", VALID_COLORS)
     key = created["key"]
     # Bypass admin scoping by inserting a settings row directly.
@@ -146,7 +146,7 @@ def test_delete_custom_theme_resets_users_to_rubedo(tmp_settings_db):
         f"SELECT theme FROM {tmp_settings_db.TABLE_NAME} WHERE user_id = ?",
         (user_id,),
     ).fetchone()
-    assert row[0] == Theme.RUBEDO.value
+    assert row[0] == Theme.STUDIO.value
 
 
 def test_delete_missing_theme_returns_false(tmp_settings_db):

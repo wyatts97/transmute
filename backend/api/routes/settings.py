@@ -175,7 +175,7 @@ def delete_custom_theme(
     db: SettingsDB = Depends(get_settings_db),
     current_user: dict = Depends(get_current_admin_user),
 ):
-    """Admin-only endpoint. Any user currently selecting this theme is reset to `rubedo`."""
+    """Admin-only endpoint. Any user currently selecting this theme is reset to the default theme (`studio`)."""
     if not db.delete_custom_theme(key):
         raise HTTPException(status_code=404, detail=f"Custom theme '{key}' not found")
     return None

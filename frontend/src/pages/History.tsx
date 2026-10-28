@@ -551,7 +551,7 @@ function History() {
             aria-selected={mode === 'convert'}
             onClick={() => handleModeChange('convert')}
             className={`px-4 py-1.5 text-sm font-medium rounded-md transition duration-150 ${
-              mode === 'convert' ? 'bg-primary text-text shadow' : 'text-text-muted hover:text-text'
+              mode === 'convert' ? 'bg-primary text-on-primary shadow' : 'text-text-muted hover:text-on-primary'
             }`}
           >
             {t('history.tabConvert')}
@@ -561,7 +561,7 @@ function History() {
             aria-selected={mode === 'compress'}
             onClick={() => handleModeChange('compress')}
             className={`px-4 py-1.5 text-sm font-medium rounded-md transition duration-150 ${
-              mode === 'compress' ? 'bg-primary text-text shadow' : 'text-text-muted hover:text-text'
+              mode === 'compress' ? 'bg-primary text-on-primary shadow' : 'text-text-muted hover:text-on-primary'
             }`}
           >
             {t('history.tabCompress')}

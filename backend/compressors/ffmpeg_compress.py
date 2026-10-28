@@ -1,5 +1,4 @@
 import subprocess  # nosec B404
-import sys
 import os
 import math
 import json
@@ -12,6 +11,7 @@ from typing import Optional
 
 from core import get_settings, validate_safe_path
 from encoding import EncodeOptions, EncodeOptionsError, EncodePlan, get_capabilities, merge_options, plan_av_encode
+from encoding.capabilities import FFMPEG_PATH, FFPROBE_PATH
 from encoding.ffmpeg_runner import ProgressCallback, run_encode_plan
 from encoding.probe import probe_media
 # Compression-level → encoder setting maps. They live in ``encoding.legacy``
@@ -105,18 +105,9 @@ class FFmpegCompressor(CompressorInterface):
     formats_with_compression_levels: set = supported_formats
     supports_options: bool = True
 
-    ffmpeg_paths = {
-        'darwin': '/opt/homebrew/bin/ffmpeg',
-        'linux': '/usr/bin/ffmpeg',
-        'win32': 'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
-    }
-    ffprobe_paths = {
-        'darwin': '/opt/homebrew/bin/ffprobe',
-        'linux': '/usr/bin/ffprobe',
-        'win32': 'C:\\Program Files\\ffmpeg\\bin\\ffprobe.exe',
-    }
-    ffmpeg_path = ffmpeg_paths.get(sys.platform, 'ffmpeg')
-    ffprobe_path = ffprobe_paths.get(sys.platform, 'ffprobe')
+    # Standard install path per platform, falling back to whatever is on PATH.
+    ffmpeg_path = FFMPEG_PATH
+    ffprobe_path = FFPROBE_PATH
     min_timeout_seconds = 30
     timeout_seconds_per_mb = 2
     max_timeout_seconds = 3600

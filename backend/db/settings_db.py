@@ -20,6 +20,7 @@ class Theme(str, Enum):
     with the app and whose CSS variables live in frontend/src/index.css.
     """
 
+    STUDIO     = "studio"
     RUBEDO     = "rubedo"
     CITRINITAS = "citrinitas"
     VIRIDITAS  = "viriditas"
@@ -118,7 +119,7 @@ def normalize_datetime_display_format(value: str) -> str:
 
 # Defaults applied when a user has no settings row yet
 _DEFAULT_SETTINGS = {
-    "theme":            Theme.RUBEDO.value,
+    "theme":            Theme.STUDIO.value,
     "auto_download":    False,
     "keep_originals":   True,
     "cleanup_enabled":  True,
@@ -182,7 +183,7 @@ class SettingsDB:
                 CREATE TABLE IF NOT EXISTS {self.TABLE_NAME} (
                     id             INTEGER PRIMARY KEY,
                     user_id        TEXT,
-                    theme          TEXT    NOT NULL DEFAULT '{Theme.RUBEDO.value}',
+                    theme          TEXT    NOT NULL DEFAULT '{Theme.STUDIO.value}',
                     auto_download  INTEGER NOT NULL DEFAULT 0,
                     keep_originals INTEGER NOT NULL DEFAULT 1,
                     cleanup_enabled INTEGER NOT NULL DEFAULT 1,
@@ -194,7 +195,7 @@ class SettingsDB:
         # Ensure every expected column exists (handles older DB schemas)
         migrate_table_columns(self.conn, self.TABLE_NAME, {
             "user_id":             "TEXT",
-            "theme":               f"TEXT NOT NULL DEFAULT '{Theme.RUBEDO.value}'",
+            "theme":               f"TEXT NOT NULL DEFAULT '{Theme.STUDIO.value}'",
             "auto_download":       "INTEGER NOT NULL DEFAULT 0",
             "keep_originals":      "INTEGER NOT NULL DEFAULT 1",
             "cleanup_enabled":     "INTEGER NOT NULL DEFAULT 1",
@@ -563,13 +564,13 @@ class SettingsDB:
         return self.get_custom_theme(key)  # type: ignore[return-value]
 
     def delete_custom_theme(self, key: str) -> bool:
-        """Delete a custom theme and reset any users currently selecting it to rubedo.
+        """Delete a custom theme and reset any users currently selecting it to the default theme.
 
         Returns True if the theme existed and was deleted.
         """
         if not self._custom_theme_exists(key):
             return False
-        fallback = Theme.RUBEDO.value
+        fallback = Theme.STUDIO.value
         with self.conn:
             # Reset users whose active selection is the theme being deleted.
             self.conn.execute(

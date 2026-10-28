@@ -2,14 +2,14 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { I18nextProvider } from 'react-i18next'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import i18n from '../i18n'
-import Converter from './Converter'
+import i18n from '../../i18n'
+import Workspace from './Workspace'
 
-function renderConverter() {
+function renderWorkspace() {
   return render(
     <I18nextProvider i18n={i18n}>
       <MemoryRouter>
-        <Converter />
+        <Workspace />
       </MemoryRouter>
     </I18nextProvider>,
   )
@@ -111,7 +111,7 @@ function defaultFetchResponse(url: string): Response | undefined {
   return undefined
 }
 
-describe('Converter drop-zone interactions', () => {
+describe('Workspace drop-zone interactions', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>
 
   beforeEach(async () => {
@@ -147,10 +147,10 @@ describe('Converter drop-zone interactions', () => {
 
   describe('paste handling', () => {
     it('uploads pasted files via POST with a FormData body', async () => {
-      renderConverter()
+      renderWorkspace()
       pasteFiles([new File(['hello world'], 'pasted.txt', { type: 'text/plain' })])
 
-      await screen.findByText('pasted.txt')
+      await screen.findAllByText('pasted.txt')
       const fileCalls = fetchSpy.mock.calls.filter(([input]: [RequestInfo | URL]) => urlMatchesPath(input, '/api/files'))
       expect(fileCalls).toHaveLength(1)
       const [, init] = fileCalls[0]
@@ -159,24 +159,24 @@ describe('Converter drop-zone interactions', () => {
     })
 
     it('uploads screenshot-style image blobs surfaced only via clipboard.items', async () => {
-      renderConverter()
+      renderWorkspace()
       pasteItems([new File([new Uint8Array([1, 2, 3, 4])], 'image.png', { type: 'image/png' })])
 
-      await screen.findByText('pasted.txt')
+      await screen.findAllByText('pasted.txt')
       expect(fileUploadCount()).toBe(1)
     })
 
     it('de-duplicates when the same file appears in both clipboard.files and clipboard.items', async () => {
-      renderConverter()
+      renderWorkspace()
       const file = new File(['hello world'], 'shared.txt', { type: 'text/plain' })
       dispatchPaste(createDataTransfer([file], '', { populateItemsFromFiles: true }))
 
-      await screen.findByText('pasted.txt')
+      await screen.findAllByText('pasted.txt')
       expect(fileUploadCount()).toBe(1)
     })
 
     it('ignores empty and text-only pastes (no file or URL upload)', async () => {
-      renderConverter()
+      renderWorkspace()
       pasteFiles([])
       pasteText('https://example.com/file.txt')
 
@@ -186,7 +186,7 @@ describe('Converter drop-zone interactions', () => {
 
     it('starts a parallel upload batch when pasted files arrive while an upload is in progress', async () => {
       const resolveUpload = stallFileUpload()
-      renderConverter()
+      renderWorkspace()
 
       pasteFiles([new File(['first'], 'first.txt', { type: 'text/plain' })])
       pasteFiles([new File(['second'], 'second.txt', { type: 'text/plain' })])
@@ -198,15 +198,15 @@ describe('Converter drop-zone interactions', () => {
 
   describe('drag-and-drop handling', () => {
     it('uploads files dropped onto the drop zone', async () => {
-      renderConverter()
+      renderWorkspace()
       dropFiles(findDropZone(), [new File(['hello world'], 'dropped.txt', { type: 'text/plain' })])
 
-      await screen.findByText('pasted.txt')
+      await screen.findAllByText('pasted.txt')
       expect(fileUploadCount()).toBe(1)
     })
 
     it('toggles the drag-over highlight across dragover/dragleave', () => {
-      renderConverter()
+      renderWorkspace()
       const dropZone = findDropZone()
 
       fireEvent(dropZone, new Event('dragover', { bubbles: true, cancelable: true }))
@@ -217,30 +217,30 @@ describe('Converter drop-zone interactions', () => {
     })
 
     it('clears the drag-over highlight after a drop', async () => {
-      renderConverter()
+      renderWorkspace()
       const dropZone = findDropZone()
 
       fireEvent(dropZone, new Event('dragover', { bubbles: true, cancelable: true }))
       expect(dropZone.className).toContain('bg-primary/10')
 
       dropFiles(dropZone, [new File(['hello world'], 'dropped.txt', { type: 'text/plain' })])
-      await screen.findByText('pasted.txt')
+      await screen.findAllByText('pasted.txt')
       expect(findDropZone().className).not.toContain('bg-primary/10')
     })
   })
 
   describe('file-select handling', () => {
     it('uploads files chosen via the hidden file input and clears the input', async () => {
-      renderConverter()
+      renderWorkspace()
       selectFilesViaInput(findFileInput(), [new File(['hello world'], 'chosen.txt', { type: 'text/plain' })])
 
-      await screen.findByText('pasted.txt')
+      await screen.findAllByText('pasted.txt')
       expect(fileUploadCount()).toBe(1)
       expect(findFileInput().value).toBe('')
     })
 
     it('ignores an empty file selection', async () => {
-      renderConverter()
+      renderWorkspace()
       selectFilesViaInput(findFileInput(), [])
       expect(fileUploadCount()).toBe(0)
     })

@@ -837,7 +837,7 @@ function Settings() {
                           setShowCreateForm(true)
                         }
                       }}
-                      className="bg-primary text-white text-sm py-2 px-3 rounded-lg hover:bg-primary-dark transition-colors duration-150"
+                      className="bg-primary text-on-primary text-sm py-2 px-3 rounded-lg hover:bg-primary-dark transition-colors duration-150"
                     >
                       {showCreateForm
                         ? t('settings.cancelCustomTheme')
@@ -937,7 +937,7 @@ function Settings() {
                         <button
                           onClick={handleSaveCustomTheme}
                           disabled={themeFormSaving}
-                          className="bg-primary text-white text-sm py-2 px-3 rounded-lg hover:bg-primary-dark transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="bg-primary text-on-primary text-sm py-2 px-3 rounded-lg hover:bg-primary-dark transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {themeFormSaving
                             ? t('settings.saving')
@@ -1043,7 +1043,7 @@ function Settings() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="bg-primary hover:bg-primary-dark text-white font-semibold py-2 px-8 rounded-lg transition duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-primary hover:bg-primary-dark text-on-primary font-semibold py-2 px-8 rounded-lg transition duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? t('account.saving') : saved ? t('settings.saved') : t('settings.saveChanges')}
               </button>

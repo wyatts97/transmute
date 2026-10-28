@@ -1,3 +1,5 @@
+import defaultTheme from 'tailwindcss/defaultTheme'
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -6,6 +8,11 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        // Self-hosted via @fontsource (imported in main.tsx); no CDN calls.
+        sans: ['"Geist Sans"', ...defaultTheme.fontFamily.sans],
+        mono: ['"Geist Mono"', ...defaultTheme.fontFamily.mono],
+      },
       // All colors reference CSS custom properties defined per [data-theme] in
       // index.css. The `<alpha-value>` placeholder lets Tailwind's opacity
       // modifiers work (e.g. bg-primary/20 → rgb(var(--color-primary) / 0.2)).
@@ -15,6 +22,7 @@ export default {
           light:   'rgb(var(--color-primary-light) / <alpha-value>)',
           dark:    'rgb(var(--color-primary-dark) / <alpha-value>)',
         },
+        'on-primary': 'rgb(var(--color-on-primary) / <alpha-value>)',
         accent:  'rgb(var(--color-accent) / <alpha-value>)',
         success: {
           DEFAULT: 'rgb(var(--color-success) / <alpha-value>)',

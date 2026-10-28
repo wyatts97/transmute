@@ -1,4 +1,5 @@
 import { authFetch, apiJson, ApiError } from './api'
+import type { EncodeOptions } from './encoding'
 
 export type ConversionJobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
 
@@ -27,6 +28,11 @@ export interface ConversionJob {
   started_at: string | null
   completed_at: string | null
   updated_at: string | null
+  preset?: string | null
+  options?: EncodeOptions | null
+  encoder_used?: string | null
+  eta_seconds?: number | null
+  speed?: number | null
 }
 
 export interface ConversionJobListResponse {
@@ -37,6 +43,8 @@ export interface ConversionJobCreatePayload {
   id: string
   output_format: string
   quality?: string | null
+  preset?: string | null
+  options?: EncodeOptions
 }
 
 export function isTerminalJobStatus(status: ConversionJobStatus): boolean {
@@ -126,6 +134,11 @@ export interface CompressionJob {
   started_at: string | null
   completed_at: string | null
   updated_at: string | null
+  preset?: string | null
+  options?: EncodeOptions | null
+  encoder_used?: string | null
+  eta_seconds?: number | null
+  speed?: number | null
 }
 
 export interface CompressionJobListResponse {
@@ -135,6 +148,8 @@ export interface CompressionJobListResponse {
 export interface CompressionJobCreatePayload {
   id: string
   compression_level?: string | null
+  preset?: string | null
+  options?: EncodeOptions
 }
 
 export async function listCompressionJobs(statusFilter?: ConversionJobStatus): Promise<CompressionJob[]> {

@@ -9,7 +9,8 @@ import { api } from './utils/api'
 
 const Account = lazy(() => import('./pages/Account'))
 const Auth = lazy(() => import('./pages/Auth'))
-const Converter = lazy(() => import('./pages/Converter'))
+const Workspace = lazy(() => import('./pages/workspace/Workspace'))
+const Presets = lazy(() => import('./pages/Presets'))
 const History = lazy(() => import('./pages/History'))
 const Files = lazy(() => import('./pages/Files'))
 const Settings = lazy(() => import('./pages/Settings'))
@@ -27,6 +28,7 @@ function RouteTitle() {
       '/': t('titles.converter'),
       '/files': t('titles.files'),
       '/history': t('titles.history'),
+      '/presets': t('titles.presets'),
       '/settings': t('titles.settings'),
       '/account': t('titles.account'),
       '/admin/users': t('titles.userManagement'),
@@ -99,7 +101,8 @@ function AppRoutes() {
     <Suspense fallback={<LoadingScreen />}>
       <Routes>
         <Route path="/auth" element={status === 'authenticated' ? <Navigate to="/" replace /> : <Auth />} />
-        <Route path="/" element={<RequireAuth><Converter /></RequireAuth>} />
+        <Route path="/" element={<RequireAuth><Workspace /></RequireAuth>} />
+        <Route path="/presets" element={<RequireAuth><Presets /></RequireAuth>} />
         <Route
           path="/files"
           element={

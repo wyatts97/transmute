@@ -7,8 +7,39 @@
   modifiers like bg-primary/20 work: rgb(var(--color-primary) / 0.2)
 */
 
-/* ── rubedo ── red flame on dark navy (default) */
-[data-theme="rubedo"], :root {
+/*
+  Text drawn on solid primary fills (buttons, active segments). White by
+  default, including for custom themes; themes with a light primary
+  override it below.
+*/
+:root {
+  --color-on-primary: 255 255 255;
+}
+
+/* ── studio ── acid lime on graphite (default) */
+[data-theme="studio"], :root {
+  color-scheme: dark;
+  --color-primary:       198 242 78;   /* #c6f24e */
+  --color-primary-light: 216 247 128;  /* #d8f780 */
+  --color-primary-dark:  166 209 42;   /* #a6d12a */
+  --color-accent:        242 184 78;   /* #f2b84e */
+  --color-success:       5   150 105;  /* #059669 */
+  --color-success-light: 52  211 153;  /* #34d399 */
+  --color-success-dark:  4   120 87;   /* #047857 */
+  --color-surface-dark:  13  14  16;   /* #0d0e10 */
+  --color-surface-light: 22  24  28;   /* #16181c */
+  --color-text:          233 234 236;  /* #e9eaec */
+  --color-text-muted:    139 144 153;  /* #8b9099 */
+}
+:root[data-theme="studio"], :root:not([data-theme]) {
+  --color-on-primary:    22  29  4;    /* #161d04 */
+}
+:root[data-theme="citrinitas"] { --color-on-primary: 20 13 45; }
+:root[data-theme="nigredo"]    { --color-on-primary: 13 13 26; }
+
+/* ── rubedo ── red flame on dark navy */
+[data-theme="rubedo"] {
+  color-scheme: dark;
   --color-primary:       239 68  68;   /* #ef4444 */
   --color-primary-light: 248 113 113;  /* #f87171 */
   --color-primary-dark:  220 38  38;   /* #dc2626 */
@@ -24,6 +55,7 @@
 
 /* ── citrinitas ── gold on deep violet */
 [data-theme="citrinitas"] {
+  color-scheme: dark;
   --color-primary:       251 191 36;   /* #fbbf24 */
   --color-primary-light: 252 211 77;   /* #fcd34d */
   --color-primary-dark:  217 119 6;    /* #d97706 */
@@ -39,6 +71,7 @@
 
 /* ── viriditas ── green on near-black */
 [data-theme="viriditas"] {
+  color-scheme: dark;
   --color-primary:       34  197 94;   /* #22c55e */
   --color-primary-light: 74  222 128;  /* #4ade80 */
   --color-primary-dark:  22  163 74;   /* #16a34a */
@@ -54,6 +87,7 @@
 
 /* ── nigredo ── soft purple on pure black */
 [data-theme="nigredo"] {
+  color-scheme: dark;
   --color-primary:       167 139 250;  /* #a78bfa */
   --color-primary-light: 196 181 253;  /* #c4b5fd */
   --color-primary-dark:  124 58  237;  /* #7c3aed */
@@ -69,6 +103,7 @@
 
 /* ── albedo ── slate on white (light mode) */
 [data-theme="albedo"] {
+  color-scheme: light;
   --color-primary:       71  85  105;  /* #475569 */
   --color-primary-light: 100 116 139;  /* #64748b */
   --color-primary-dark:  51  65  85;   /* #334155 */
@@ -84,6 +119,7 @@
 
 /* ── caelum ── sky blue on cool white (light mode) */
 [data-theme="caelum"] {
+  color-scheme: light;
   --color-primary:       2   132 199;  /* #0284c7 */
   --color-primary-light: 56  189 248;  /* #38bdf8 */
   --color-primary-dark:  3   105 161;  /* #0369a1 */
@@ -99,6 +135,7 @@
 
 /* ── aurora ── burnt orange on warm cream (light mode) */
 [data-theme="aurora"] {
+  color-scheme: light;
   --color-primary:       234 88  12;   /* #ea580c */
   --color-primary-light: 251 146 60;   /* #fb923c */
   --color-primary-dark:  154 52  18;   /* #9a3412 */
@@ -114,6 +151,7 @@
 
 /* ── argentum ── silver violet on porcelain white (light mode) */
 [data-theme="argentum"] {
+  color-scheme: light;
   --color-primary:       139 122 168;  /* #8b7aa8 */
   --color-primary-light: 181 166 208;  /* #b5a6d0 */
   --color-primary-dark:  103 88  128;  /* #675880 */
@@ -130,6 +168,38 @@
 @layer base {
   html, body {
     background-color: rgb(var(--color-surface-dark));
+    color: rgb(var(--color-text));
+  }
+  body {
+    font-family: theme('fontFamily.sans');
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  ::selection {
+    background: rgb(var(--color-primary) / 0.3);
+  }
+  input[type="range"], input[type="checkbox"], input[type="radio"] {
+    accent-color: rgb(var(--color-primary));
+  }
+}
+
+@layer components {
+  /* Small uppercase-free field label used across the workspace. */
+  .field-label {
+    @apply mb-1.5 block text-[11px] tracking-wide text-text-muted;
+  }
+  /* Shared control chrome: selects and inputs in dense tool panels. */
+  .field-control {
+    @apply h-8 w-full rounded-md border border-text/10 bg-surface-dark px-2 text-xs text-text outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn {
+    @apply inline-flex h-8 items-center justify-center gap-2 rounded-md border border-text/15 bg-surface-light px-3 text-xs font-medium text-text transition hover:border-text/30 disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-primary {
+    @apply inline-flex h-8 items-center justify-center gap-2 rounded-md bg-primary px-3 text-xs font-semibold text-on-primary transition hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .panel {
+    @apply rounded-lg border border-text/10 bg-surface-light;
   }
 }
 

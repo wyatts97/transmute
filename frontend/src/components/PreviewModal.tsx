@@ -275,7 +275,7 @@ function MediaControlsBar({ controls, showFullscreen, onFullscreen, hideDuration
     <div className="flex items-center gap-3 w-full">
       <button
         onClick={togglePlay}
-        className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-text hover:bg-primary-dark transition duration-200 flex-shrink-0"
+        className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-on-primary hover:bg-primary-dark transition duration-200 flex-shrink-0"
       >
         {playing ? <FaPause className="text-xs" /> : <FaPlay className="text-xs ml-0.5" />}
       </button>
