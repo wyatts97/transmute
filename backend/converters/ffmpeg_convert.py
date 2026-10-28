@@ -5,11 +5,22 @@ import math
 import json
 import shutil
 import tempfile
+import threading
 
 from pathlib import Path
 from typing import Optional
 from .converter_interface import ConverterInterface
-from core import validate_safe_path
+from core import get_settings, validate_safe_path
+from encoding import EncodeOptions, get_capabilities, merge_options, plan_av_encode
+from encoding.ffmpeg_runner import ProgressCallback, run_encode_plan
+from encoding.legacy import (
+    CONVERT_AC3_BITRATE_BY_QUALITY,
+    CONVERT_AUDIO_BITRATE_BY_QUALITY,
+    CONVERT_CRF_PRESET_BY_QUALITY,
+    CONVERT_QSCALE_BY_QUALITY,
+    legacy_conversion_base,
+)
+from encoding.probe import probe_media
 
 class FFmpegConverter(ConverterInterface):
     video_formats: set = {
@@ -70,6 +81,7 @@ class FFmpegConverter(ConverterInterface):
         'm4v', 'flv', 'mpeg', 'wmv', 'asf',
         'mp3', 'aac', 'wma', 'm4a', 'opus', 'mp2', 'ac3', 'oga', 'm4b',
     }
+    supports_options: bool = True
     supported_input_formats: set = video_formats | audio_formats
     supported_output_formats: set = (video_formats | audio_formats) - _decode_only_formats
 
@@ -329,14 +341,65 @@ class FFmpegConverter(ConverterInterface):
         else:
             return cls.supported_output_formats - {fmt}
     
-    def convert(self, overwrite: bool = True, quality: Optional[str] = None) -> str:
+    def _convert_with_options(
+        self,
+        *,
+        output_file: str,
+        quality: Optional[str],
+        options: EncodeOptions,
+        progress_cb: Optional[ProgressCallback],
+        cancel_event: Optional[threading.Event],
+    ) -> list[str]:
+        """Convert with advanced options layered over the quality preset."""
+        validate_safe_path(self.input_file)
+        base = legacy_conversion_base(self.output_type, quality)
+        if base is None:
+            raise ValueError(f"Advanced options aren't supported for {self.output_type} output yet")
+        merged = merge_options(base, options)
+        caps = get_capabilities()
+        plan = plan_av_encode(self.output_type, merged, caps)
+
+        staged_input = self._stage_animated_webp_input()
+        source = staged_input or self.input_file
+        try:
+            self.encoder_used = run_encode_plan(
+                plan,
+                input_file=source,
+                output_file=output_file,
+                info=probe_media(source),
+                caps=caps,
+                tmp_dir=str(get_settings().tmp_dir),
+                progress_cb=progress_cb,
+                cancel_event=cancel_event,
+            )
+        except Exception:
+            if os.path.exists(output_file):
+                os.remove(output_file)
+            raise
+        finally:
+            if staged_input is not None:
+                shutil.rmtree(Path(staged_input).parent, ignore_errors=True)
+        return [output_file]
+
+    def convert(
+        self,
+        overwrite: bool = True,
+        quality: Optional[str] = None,
+        options: Optional[EncodeOptions] = None,
+        progress_cb: Optional[ProgressCallback] = None,
+        cancel_event: Optional[threading.Event] = None,
+    ) -> str:
         """
         Convert the input file to the output format using FFmpeg.
-        
+
         Args:
             overwrite: Whether to overwrite existing output file (default: True)
             quality: Optional quality setting for video ('high', 'medium', 'low')
-        
+            options: Advanced encoder options merged over the quality preset.
+                ``None`` keeps the exact legacy command.
+            progress_cb: Called with encode progress (options path only).
+            cancel_event: Set to stop a running encode (options path only).
+
         Returns:
             Path to the converted output file
             
@@ -359,7 +422,18 @@ class FFmpegConverter(ConverterInterface):
         # Generate output filename
         input_filename = Path(self.input_file).stem
         output_file = os.path.join(self.output_dir, f"{input_filename}.{self.output_type}")
-        
+
+        if options is not None:
+            if not overwrite and os.path.exists(output_file):
+                return [output_file]
+            return self._convert_with_options(
+                output_file=output_file,
+                quality=quality,
+                options=options,
+                progress_cb=progress_cb,
+                cancel_event=cancel_event,
+            )
+
         # Build FFmpeg command
         cmd = [self.ffmpeg_path]
         
@@ -382,30 +456,25 @@ class FFmpegConverter(ConverterInterface):
         # Add quality settings for video formats using CRF/preset (libx264-based)
         _quality_crf_video_formats = {'mp4', 'avi', 'mov', 'mkv', 'webm', 'ts', '3gp', 'ogv', 'f4v', 'm4v'}
         if quality and self.output_type in _quality_crf_video_formats:
-            if quality == 'high':
-                cmd.extend(['-crf', '18', '-preset', 'slow'])
-            elif quality == 'medium':
-                cmd.extend(['-crf', '23', '-preset', 'medium'])
-            elif quality == 'low':
-                cmd.extend(['-crf', '28', '-preset', 'fast'])
+            crf_preset = CONVERT_CRF_PRESET_BY_QUALITY.get(quality)
+            if crf_preset:
+                crf, preset = crf_preset
+                cmd.extend(['-crf', crf, '-preset', preset])
 
         # Quality settings for video formats whose default codecs use qscale
         _quality_qscale_video_formats = {'flv', 'mpeg', 'wmv', 'asf'}
         if quality and self.output_type in _quality_qscale_video_formats:
-            if quality == 'high':
-                cmd.extend(['-q:v', '2'])
-            elif quality == 'medium':
-                cmd.extend(['-q:v', '5'])
-            elif quality == 'low':
-                cmd.extend(['-q:v', '9'])
+            qscale = CONVERT_QSCALE_BY_QUALITY.get(quality)
+            if qscale:
+                cmd.extend(['-q:v', qscale])
 
         # Quality settings for lossy audio formats via bitrate
         _quality_audio_formats = {'mp3', 'aac', 'wma', 'm4a', 'opus', 'mp2', 'ac3', 'oga', 'm4b'}
         if quality and self.output_type in _quality_audio_formats:
             if self.output_type == 'ac3':
-                bitrates = {'high': '448k', 'medium': '256k', 'low': '128k'}
+                bitrates = CONVERT_AC3_BITRATE_BY_QUALITY
             else:
-                bitrates = {'high': '320k', 'medium': '192k', 'low': '96k'}
+                bitrates = CONVERT_AUDIO_BITRATE_BY_QUALITY
             bitrate = bitrates.get(quality)
             if bitrate:
                 cmd.extend(['-b:a', bitrate])

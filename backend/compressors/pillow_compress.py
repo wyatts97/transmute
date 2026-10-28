@@ -10,17 +10,17 @@ import pillow_avif  # noqa: F401 — registers AVIF plugin on import
 import pillow_jxl   # noqa: F401 — registers JPEG XL plugin on import
 
 from core import get_settings
-from .compressor_interface import CompressorInterface
-
-
+from encoding import EncodeOptions, merge_options
+from encoding.image import apply_image_options, validate_image_options
 # Encoder quality value (0-100, higher = better quality / larger file)
 # keyed by compression-level preset. Used by the lossy encoders.
-_QUALITY_BY_LEVEL: dict[str, int] = {
-    'light': 90,
-    'balanced': 75,
-    'max': 50,
-}
-_DEFAULT_QUALITY = _QUALITY_BY_LEVEL['balanced']
+from encoding.legacy import (
+    DEFAULT_IMAGE_QUALITY as _DEFAULT_QUALITY,
+    IMAGE_QUALITY_BY_LEVEL as _QUALITY_BY_LEVEL,
+    legacy_image_compression_base,
+)
+from .compressor_interface import CompressorInterface
+
 
 # JPEG 2000 uses quality_layers (PSNR-like). Lower = smaller file.
 _JP2_QUALITY_BY_LEVEL: dict[str, list[int]] = {
@@ -73,6 +73,7 @@ class PillowCompressor(CompressorInterface):
         'heic',
         'tiff',
     }
+    supports_options: bool = True
 
     def __init__(self, input_file: str, output_dir: str, media_type: str):
         """
@@ -92,13 +93,24 @@ class PillowCompressor(CompressorInterface):
         """
         return self.media_type in self.supported_formats
 
-    def compress(self, overwrite: bool = True, compression_level: Optional[str] = None) -> list[str]:
+    def compress(
+        self,
+        overwrite: bool = True,
+        compression_level: Optional[str] = None,
+        options: Optional[EncodeOptions] = None,
+        progress_cb=None,
+        cancel_event=None,
+    ) -> list[str]:
         """
         Compress the input image, writing a same-format file to ``output_dir``.
 
         Args:
             overwrite: Whether to overwrite an existing output file (default: True).
             compression_level: One of ``"light"``, ``"balanced"``, ``"max"``.
+            options: Advanced image options merged over the level preset.
+                ``None`` keeps the exact legacy save settings.
+            progress_cb: Accepted for interface parity; images encode in one step.
+            cancel_event: Accepted for interface parity.
 
         Returns:
             List containing the path to the compressed output file.
@@ -122,6 +134,11 @@ class PillowCompressor(CompressorInterface):
         if not overwrite and os.path.exists(output_file):
             return [output_file]
 
+        merged = None
+        if options is not None:
+            merged = merge_options(legacy_image_compression_base(self.media_type, compression_level), options)
+            validate_image_options(self.media_type, merged)
+
         # Encode into the shared tmp dir so we can fall back to the original
         # bytes if the encoder would produce a larger file (and so input==output
         # callers don't lose their source mid-encode).
@@ -137,15 +154,20 @@ class PillowCompressor(CompressorInterface):
         try:
             img = Image.open(self.input_file)
             img = self._normalize_mode(img, self.media_type)
-            save_kwargs = self._build_save_kwargs(self.media_type, compression_level)
+            if merged is not None:
+                img, save_kwargs = apply_image_options(img, self.media_type, merged)
+                self.encoder_used = 'pillow'
+            else:
+                save_kwargs = self._build_save_kwargs(self.media_type, compression_level)
             img.save(tmp_output, **save_kwargs)
         except Exception as exc:
             if os.path.exists(tmp_output):
                 os.remove(tmp_output)
             raise RuntimeError(f"Image compression failed: {exc}")
 
+        keep_if_larger = merged.keep_if_larger if merged is not None else False
         try:
-            if os.path.getsize(tmp_output) < original_size:
+            if keep_if_larger or os.path.getsize(tmp_output) < original_size:
                 shutil.move(tmp_output, output_file)
             else:
                 if os.path.abspath(self.input_file) != os.path.abspath(output_file):

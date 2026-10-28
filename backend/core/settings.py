@@ -63,6 +63,13 @@ class Settings(BaseSettings):
     # Number of background worker threads for the compression queue.
     compression_worker_concurrency: int = 5
 
+    # ===== Encoding =====
+    # Hardware video encoding: "auto" uses VAAPI when the render node exists
+    # and a test encode succeeds, "vaapi" behaves the same but documents
+    # intent, "off" forces software encoders.
+    hw_accel: str = "auto"
+    vaapi_device: str = "/dev/dri/renderD128"
+
     # ===== PDF conversion =====
     # When converting PDF -> PDF/A, digitally signed PDFs cannot be processed
     # without invalidating their signatures. If True, allow ocrmypdf to strip

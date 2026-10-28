@@ -17,6 +17,8 @@ class ConverterInterface:
     supported_output_formats: set = set()  # To be defined by subclasses with supported output formats
     qualities: set = set()  # Optional quality settings for conversion, can be overridden by subclasses
     formats_with_qualities: set = set()  # Optional set of output formats that have quality options, can be overridden by subclasses
+    supports_options: bool = False  # Whether convert() accepts advanced ``options`` (encoding.EncodeOptions)
+    encoder_used: Optional[str] = None  # Set by option-aware converters to the encoder that produced the output
 
     qualities = {
         'low',
@@ -103,7 +105,11 @@ class ConverterInterface:
     def convert(self, overwrite: bool = True, quality: Optional[str] = None) -> list[str]:
         """
         Convert the input file to the output format.
-        
+
+        Converters with ``supports_options = True`` also accept the keyword
+        arguments ``options`` (``encoding.EncodeOptions``), ``progress_cb`` and
+        ``cancel_event``. Callers only pass them to such converters.
+
         Args:
             overwrite: Whether to overwrite existing output file (default: True)
             quality: Quality setting for conversion (e.g., "high", "medium", "low")

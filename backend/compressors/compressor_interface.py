@@ -20,6 +20,8 @@ class CompressorInterface:
     supported_formats: set = set()  # Formats this compressor can compress (input == output)
     compression_levels: set = set()  # Optional compression-level presets (e.g. "light", "balanced", "max")
     formats_with_compression_levels: set = set()  # Subset of supported_formats that honor a compression_level argument
+    supports_options: bool = False  # Whether compress() accepts advanced ``options`` (encoding.EncodeOptions)
+    encoder_used: Optional[str] = None  # Set by option-aware compressors to the encoder that produced the output
 
     compression_levels = {
         'light',
@@ -95,6 +97,10 @@ class CompressorInterface:
     def compress(self, overwrite: bool = True, compression_level: Optional[str] = None) -> list[str]:
         """
         Compress the input file, writing the result into ``output_dir``.
+
+        Compressors with ``supports_options = True`` also accept the keyword
+        arguments ``options`` (``encoding.EncodeOptions``), ``progress_cb`` and
+        ``cancel_event``. Callers only pass them to such compressors.
 
         Args:
             overwrite: Whether to overwrite an existing output file (default: True).

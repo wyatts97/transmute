@@ -5,102 +5,43 @@ import math
 import json
 import shutil
 import tempfile
+import threading
 import logging
 from pathlib import Path
 from typing import Optional
 
 from core import get_settings, validate_safe_path
+from encoding import EncodeOptions, get_capabilities, merge_options, plan_av_encode
+from encoding.ffmpeg_runner import ProgressCallback, run_encode_plan
+from encoding.probe import probe_media
+# Compression-level → encoder setting maps. They live in ``encoding.legacy``
+# so the advanced options path can translate presets into options; see there
+# for what each level means.
+from encoding.legacy import (
+    legacy_compression_base,
+    AC3_BITRATE_BY_LEVEL as _AC3_BITRATE_BY_LEVEL,
+    AUDIO_BITRATE_BY_LEVEL as _AUDIO_BITRATE_BY_LEVEL,
+    DEFAULT_AC3_BITRATE as _DEFAULT_AC3_BITRATE,
+    DEFAULT_AUDIO_BITRATE as _DEFAULT_AUDIO_BITRATE,
+    DEFAULT_FLAC_COMPRESSION as _DEFAULT_FLAC_COMPRESSION,
+    DEFAULT_GIF_BAYER_SCALE as _DEFAULT_GIF_BAYER_SCALE,
+    DEFAULT_GIF_MAX_COLORS as _DEFAULT_GIF_MAX_COLORS,
+    DEFAULT_H264_CRF as _DEFAULT_H264_CRF,
+    DEFAULT_H264_PRESET as _DEFAULT_H264_PRESET,
+    DEFAULT_QSCALE as _DEFAULT_QSCALE,
+    DEFAULT_VP9_CRF as _DEFAULT_VP9_CRF,
+    FLAC_COMPRESSION_BY_LEVEL as _FLAC_COMPRESSION_BY_LEVEL,
+    GIF_BAYER_SCALE_BY_LEVEL as _GIF_BAYER_SCALE_BY_LEVEL,
+    GIF_MAX_COLORS_BY_LEVEL as _GIF_MAX_COLORS_BY_LEVEL,
+    H264_CRF_BY_LEVEL as _H264_CRF_BY_LEVEL,
+    H264_PRESET_BY_LEVEL as _H264_PRESET_BY_LEVEL,
+    QSCALE_BY_LEVEL as _QSCALE_BY_LEVEL,
+    VP9_CRF_BY_LEVEL as _VP9_CRF_BY_LEVEL,
+)
 from .compressor_interface import CompressorInterface
 
 
 logger = logging.getLogger(__name__)
-
-
-# --- Compression-level → encoder setting maps -------------------------------
-#
-# Compression keeps the source format but re-encodes the media at lower
-# quality so the output is smaller. ``light`` favors fidelity over size
-# reduction, ``max`` favors maximum size reduction, ``balanced`` sits between.
-
-# H.264 CRF (Constant Rate Factor, 0-51, higher = smaller / lower quality).
-_H264_CRF_BY_LEVEL: dict[str, int] = {
-    'light': 26,
-    'balanced': 30,
-    'max': 33,
-}
-_DEFAULT_H264_CRF = _H264_CRF_BY_LEVEL['balanced']
-
-# libx264 encoding preset. Slower presets compress better at the cost of time.
-_H264_PRESET_BY_LEVEL: dict[str, str] = {
-    'light': 'fast',
-    'balanced': 'medium',
-    'max': 'slow',
-}
-_DEFAULT_H264_PRESET = _H264_PRESET_BY_LEVEL['balanced']
-
-# VP9 CRF (0-63, higher = smaller / lower quality). Paired with ``-b:v 0`` for
-# constant-quality mode.
-_VP9_CRF_BY_LEVEL: dict[str, int] = {
-    'light': 31,
-    'balanced': 36,
-    'max': 41,
-}
-_DEFAULT_VP9_CRF = _VP9_CRF_BY_LEVEL['balanced']
-
-# MPEG-family qscale (``-q:v``, ~1-31, higher = smaller / lower quality). Used
-# by the default codecs of flv/mpeg/wmv/asf containers.
-_QSCALE_BY_LEVEL: dict[str, int] = {
-    'light': 5,
-    'balanced': 9,
-    'max': 15,
-}
-_DEFAULT_QSCALE = _QSCALE_BY_LEVEL['balanced']
-
-# Audio bitrate per level for lossy audio codecs (and the audio track of
-# re-encoded video). Lower bitrate = smaller / lower quality.
-_AUDIO_BITRATE_BY_LEVEL: dict[str, str] = {
-    'light': '160k',
-    'balanced': '112k',
-    'max': '80k',
-}
-_DEFAULT_AUDIO_BITRATE = _AUDIO_BITRATE_BY_LEVEL['balanced']
-
-# AC-3 has a higher practical minimum bitrate than other codecs.
-_AC3_BITRATE_BY_LEVEL: dict[str, str] = {
-    'light': '256k',
-    'balanced': '192k',
-    'max': '128k',
-}
-_DEFAULT_AC3_BITRATE = _AC3_BITRATE_BY_LEVEL['balanced']
-
-# FLAC is lossless: a higher compression level (0-12) produces a smaller file
-# with no quality loss, at the cost of more encoding time.
-_FLAC_COMPRESSION_BY_LEVEL: dict[str, int] = {
-    'light': 8,
-    'balanced': 10,
-    'max': 12,
-}
-_DEFAULT_FLAC_COMPRESSION = _FLAC_COMPRESSION_BY_LEVEL['balanced']
-
-# Animated GIF is re-encoded with a freshly generated palette so the animation
-# (all frames + timing) is preserved. Size is controlled by the palette color
-# count and the dithering method. Fewer colors and ordered (Bayer) dithering
-# yield smaller files; error-diffusion (sierra2_4a) preserves the most detail.
-_GIF_MAX_COLORS_BY_LEVEL: dict[str, int] = {
-    'light': 256,
-    'balanced': 128,
-    'max': 64,
-}
-_DEFAULT_GIF_MAX_COLORS = _GIF_MAX_COLORS_BY_LEVEL['balanced']
-
-# Bayer dither scale (1-5, higher = smaller / more banding). ``None`` selects
-# error-diffusion (sierra2_4a) for the best quality at the ``light`` preset.
-_GIF_BAYER_SCALE_BY_LEVEL: dict[str, Optional[int]] = {
-    'light': None,
-    'balanced': 3,
-    'max': 5,
-}
-_DEFAULT_GIF_BAYER_SCALE = _GIF_BAYER_SCALE_BY_LEVEL['balanced']
 
 
 class FFmpegCompressor(CompressorInterface):
@@ -162,6 +103,7 @@ class FFmpegCompressor(CompressorInterface):
 
     supported_formats: set = video_formats | audio_formats | _gif_formats
     formats_with_compression_levels: set = supported_formats
+    supports_options: bool = True
 
     ffmpeg_paths = {
         'darwin': '/opt/homebrew/bin/ffmpeg',
@@ -401,7 +343,14 @@ class FFmpegCompressor(CompressorInterface):
         ])
         return args
 
-    def compress(self, overwrite: bool = True, compression_level: Optional[str] = None) -> list[str]:
+    def compress(
+        self,
+        overwrite: bool = True,
+        compression_level: Optional[str] = None,
+        options: Optional[EncodeOptions] = None,
+        progress_cb: Optional[ProgressCallback] = None,
+        cancel_event: Optional[threading.Event] = None,
+    ) -> list[str]:
         """
         Compress the input audio/video file, writing a same-format file to
         ``output_dir``.
@@ -409,6 +358,10 @@ class FFmpegCompressor(CompressorInterface):
         Args:
             overwrite: Whether to overwrite an existing output file (default: True).
             compression_level: One of ``"light"``, ``"balanced"``, ``"max"``.
+            options: Advanced encoder options merged over the level preset.
+                ``None`` keeps the exact legacy command.
+            progress_cb: Called with encode progress (options path only).
+            cancel_event: Set to stop a running encode (options path only).
 
         Returns:
             List containing the path to the compressed output file.
@@ -445,6 +398,17 @@ class FFmpegCompressor(CompressorInterface):
         os.close(tmp_fd)
 
         validate_safe_path(self.input_file)
+        if options is not None:
+            return self._compress_with_options(
+                tmp_output=tmp_output,
+                output_file=output_file,
+                original_size=original_size,
+                compression_level=compression_level,
+                options=options,
+                progress_cb=progress_cb,
+                cancel_event=cancel_event,
+            )
+
         cmd = [
             self.ffmpeg_path,
             '-y',  # Always overwrite the pre-created tmp file.
@@ -485,8 +449,13 @@ class FFmpegCompressor(CompressorInterface):
                 "https://ffmpeg.org/download.html"
             )
 
+        self._keep_smaller(tmp_output, output_file, original_size)
+        return [output_file]
+
+    def _keep_smaller(self, tmp_output: str, output_file: str, original_size: int, keep_if_larger: bool = False) -> None:
+        """Publish the re-encode, or the original bytes when it didn't shrink."""
         try:
-            if os.path.getsize(tmp_output) < original_size:
+            if keep_if_larger or os.path.getsize(tmp_output) < original_size:
                 shutil.move(tmp_output, output_file)
             else:
                 if os.path.abspath(self.input_file) != os.path.abspath(output_file):
@@ -495,4 +464,39 @@ class FFmpegCompressor(CompressorInterface):
             if os.path.exists(tmp_output):
                 os.remove(tmp_output)
 
+    def _compress_with_options(
+        self,
+        *,
+        tmp_output: str,
+        output_file: str,
+        original_size: int,
+        compression_level: Optional[str],
+        options: EncodeOptions,
+        progress_cb: Optional[ProgressCallback],
+        cancel_event: Optional[threading.Event],
+    ) -> list[str]:
+        """Re-encode with advanced options layered over the level preset."""
+        try:
+            base = legacy_compression_base(self.media_type, compression_level)
+            if base is None:
+                raise ValueError(f"Advanced options aren't supported for {self.media_type} compression yet")
+            merged = merge_options(base, options)
+            caps = get_capabilities()
+            plan = plan_av_encode(self.media_type, merged, caps)
+            self.encoder_used = run_encode_plan(
+                plan,
+                input_file=self.input_file,
+                output_file=tmp_output,
+                info=probe_media(self.input_file),
+                caps=caps,
+                tmp_dir=str(get_settings().tmp_dir),
+                progress_cb=progress_cb,
+                cancel_event=cancel_event,
+            )
+        except Exception:
+            if os.path.exists(tmp_output):
+                os.remove(tmp_output)
+            raise
+
+        self._keep_smaller(tmp_output, output_file, original_size, keep_if_larger=merged.keep_if_larger)
         return [output_file]

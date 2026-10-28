@@ -7,6 +7,9 @@ from PIL import Image
 from pillow_heif import HeifImagePlugin
 import pillow_avif  # noqa: F401 — registers AVIF plugin on import
 import pillow_jxl   # noqa: F401 — registers JPEG XL plugin on import
+from encoding import EncodeOptions, merge_options
+from encoding.image import apply_image_options, validate_image_options
+from encoding.legacy import legacy_image_conversion_base
 from .converter_interface import ConverterInterface
 
 try:
@@ -27,6 +30,7 @@ _GHOSTSCRIPT_AVAILABLE = shutil.which('gs') is not None or shutil.which('gswin32
 
 
 class PillowConverter(ConverterInterface):
+    supports_options: bool = True
     supported_input_formats: set = {
         'jpeg',
         'png',
@@ -167,14 +171,25 @@ class PillowConverter(ConverterInterface):
         return base_formats
 
     
-    def convert(self, overwrite: bool = True, quality: Optional[str] = None) -> list[str]:
+    def convert(
+        self,
+        overwrite: bool = True,
+        quality: Optional[str] = None,
+        options: Optional[EncodeOptions] = None,
+        progress_cb=None,
+        cancel_event=None,
+    ) -> list[str]:
         """
         Convert the input image file to the output format using Pillow.
-        
+
         Args:
             overwrite: Whether to overwrite existing output file (default: True)
             quality: Quality setting for lossy formats ('high', 'medium', 'low')
-        
+            options: Advanced image options merged over the quality preset.
+                ``None`` keeps the exact legacy save settings.
+            progress_cb: Accepted for interface parity; images encode in one step.
+            cancel_event: Accepted for interface parity.
+
         Returns:
             List containing the path to the converted output file
             
@@ -201,7 +216,12 @@ class PillowConverter(ConverterInterface):
         # Check if output file exists and overwrite is False
         if not overwrite and os.path.exists(output_file):
             return [output_file]
-        
+
+        merged = None
+        if options is not None:
+            merged = merge_options(legacy_image_conversion_base(self.output_type, quality), options)
+            validate_image_options(self.output_type, merged)
+
         try:
             # Handle SVG input specially
             input_fmt = self.input_type.lower()
@@ -299,6 +319,11 @@ class PillowConverter(ConverterInterface):
             # For PNG, handle optimization
             if output_fmt == 'png':
                 save_kwargs['optimize'] = True
+
+            # Advanced options replace the preset save settings entirely.
+            if merged is not None:
+                img, save_kwargs = apply_image_options(img, output_fmt, merged)
+                self.encoder_used = 'pillow'
 
             # Save the image
             img.save(output_file, **save_kwargs)
