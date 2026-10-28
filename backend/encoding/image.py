@@ -11,9 +11,25 @@ from .resolve import EncodeOptionsError
 # image outputs accept only max_dimension and strip_metadata.
 TUNABLE_IMAGE_FORMATS = frozenset({"jpeg", "png", "webp", "avif", "jxl", "heif", "heic"})
 _LOSSLESS_FORMATS = frozenset({"webp", "jxl", "png"})
+_QUALITY_FORMATS = TUNABLE_IMAGE_FORMATS - {"png"}
 _EFFORT_FORMATS = frozenset({"jpeg", "png", "webp", "avif", "jxl"})
 _CHROMA_FORMATS = frozenset({"jpeg", "avif"})
 _JPEG_SUBSAMPLING = {"4:4:4": 0, "4:2:2": 1, "4:2:0": 2}
+
+
+def describe_image_formats() -> list[dict]:
+    """Which ``options.image`` fields each tunable image output accepts."""
+    return [
+        {
+            "format": fmt,
+            "quality": fmt in _QUALITY_FORMATS,
+            "lossless": fmt in _LOSSLESS_FORMATS,
+            "effort": fmt in _EFFORT_FORMATS,
+            "chroma_subsampling": fmt in _CHROMA_FORMATS,
+            "palette_colors": fmt == "png",
+        }
+        for fmt in sorted(TUNABLE_IMAGE_FORMATS)
+    ]
 
 
 def validate_image_options(fmt: str, options: EncodeOptions) -> None:

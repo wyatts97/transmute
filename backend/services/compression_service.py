@@ -16,6 +16,7 @@ from __future__ import annotations
 import errno
 from pathlib import Path
 import shutil
+import threading
 import uuid
 
 from compressors import CompressorInterface
@@ -34,10 +35,25 @@ from db import (
     FileDB,
     SettingsDB,
 )
+from encoding import EncodeOptions
+from encoding.ffmpeg_runner import ProgressCallback
+
+from .encode_options import options_to_dict
 
 
 class CompressionFailedError(RuntimeError):
     """Raised when the underlying compressor fails to produce output."""
+
+
+def _encode_metadata(options: EncodeOptions | None, preset: str | None, compressor) -> dict:
+    """Advanced-encoding fields recorded with the output (empty on the legacy path)."""
+    if options is None:
+        return {}
+    return {
+        "options": options_to_dict(options),
+        "preset": preset,
+        "encoder_used": getattr(compressor, "encoder_used", None),
+    }
 
 
 def _move_output_file(source_path: Path, target_path: Path) -> Path:
@@ -63,6 +79,10 @@ def run_compression_job(
     compression_relations_db: CompressionRelationsDB,
     settings_db: SettingsDB,
     default_compression_levels_db: DefaultCompressionLevelsDB | None = None,
+    options: EncodeOptions | None = None,
+    preset: str | None = None,
+    progress_cb: ProgressCallback | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> dict:
     """Execute a compression and persist the resulting metadata.
 
@@ -81,6 +101,11 @@ def run_compression_job(
             Shared DB handles supplied by the caller.
         default_compression_levels_db: Optional handle used to resolve a
             default level when ``compression_level`` is ``None``.
+        options: Resolved advanced options (see ``encode_options``). ``None``
+            keeps the legacy behavior.
+        preset: Preset key or id the options came from, recorded with the output.
+        progress_cb: Receives encode progress (advanced options path only).
+        cancel_event: Set to stop a running encode (advanced options path only).
 
     Returns:
         The compressed file metadata dict (including ``id``,
@@ -118,8 +143,14 @@ def run_compression_job(
         media_format,
     )
 
+    compress_kwargs: dict = {"compression_level": compression_level}
+    if options is not None:
+        if not getattr(compressor_type, "supports_options", False):
+            raise CompressionFailedError(f"Advanced options aren't supported for {media_format} compression")
+        compress_kwargs.update(options=options, progress_cb=progress_cb, cancel_event=cancel_event)
+
     try:
-        output_files = compressor.compress(compression_level=compression_level)
+        output_files = compressor.compress(**compress_kwargs)
     except Exception as exc:
         raise CompressionFailedError(str(exc)) from exc
 
@@ -142,11 +173,14 @@ def run_compression_job(
     compressed_metadata.pop("created_at", None)
     if compression_level:
         compressed_metadata["compression_level"] = compression_level
+    encode_metadata = _encode_metadata(options, preset, compressor)
+    compressed_metadata.update(encode_metadata)
 
     compression_db.insert_file_metadata(compressed_metadata)
     if compression_level:
         # ``insert_file_metadata`` pops compression_level off; re-attach for the return value.
         compressed_metadata["compression_level"] = compression_level
+    compressed_metadata.update(encode_metadata)
 
     compression_relations_db.insert_compression_relation({
         "original_file_id": source_metadata["id"],

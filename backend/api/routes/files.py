@@ -9,7 +9,7 @@ from fastapi import APIRouter, File, UploadFile, HTTPException, Depends, Backgro
 from fastapi.responses import FileResponse
 from zipfile import ZipFile
 from pathlib import Path
-from core import get_settings, detect_media_type, sanitize_extension, sanitize_filename, delete_file_and_metadata, validate_safe_path, get_file_extension
+from core import get_settings, media_type_aliases, detect_media_type, sanitize_extension, sanitize_filename, delete_file_and_metadata, validate_safe_path, get_file_extension
 from db import FileDB, ConversionDB, CompressionDB
 from registry import registry as converter_registry
 from api.deps import get_current_active_user, get_file_db, get_conversion_db, get_compression_db
@@ -17,11 +17,14 @@ from api.schemas import (
     FileListResponse, FileUploadResponse, FileUrlUploadResponse, FileDeleteResponse,
     ErrorResponse, BatchDownloadRequest, UrlUploadRequest,
     ChunkedUploadInitRequest, ChunkedUploadInitResponse, ChunkedUploadChunkResponse,
-    ChunkedUploadCompleteRequest, UploadConfigResponse,
+    ChunkedUploadCompleteRequest, UploadConfigResponse, FileProbeResponse,
 )
 from registry import downloader_registry
 from downloaders import DownloadError, YtDlpDownloader
 from converters.ffmpeg_convert import FFmpegConverter
+from converters.pillow_convert import PillowConverter
+from encoding.probe import probe_media
+from PIL import Image
 
 logger = logging.getLogger(__name__)
 
@@ -293,6 +296,80 @@ def get_file(
                 filename=build_zip_entry_name(metadata, db is not file_db),
                 media_type=mime_type
             )
+    raise HTTPException(status_code=404, detail="File not found")
+
+
+def _probe_kind(media_type: str) -> str:
+    fmt = media_type_aliases.get(media_type.lower(), media_type.lower())
+    if fmt in FFmpegConverter.audio_formats or fmt == "webaudio":
+        return "audio"
+    if fmt in PillowConverter.supported_input_formats:
+        return "image"
+    if fmt in FFmpegConverter.video_formats or fmt == "webvideo":
+        return "video"
+    return "other"
+
+
+def _probe_image(path: Path) -> dict | None:
+    try:
+        with Image.open(path) as img:
+            return {
+                "width": img.width,
+                "height": img.height,
+                "mode": img.mode,
+                "format": img.format,
+                "frames": getattr(img, "n_frames", 1),
+                "has_exif": bool(img.getexif()),
+                "has_icc": bool(img.info.get("icc_profile")),
+            }
+    except Exception:  # noqa: BLE001 - unreadable images just report kind "other"
+        return None
+
+
+@router.get(
+    "/{file_id}/probe",
+    summary="Inspect a file's media streams",
+    responses={
+        200: {
+            "model": FileProbeResponse,
+            "description": "Duration, streams, codecs, resolution and bit depth for audio/video; dimensions and metadata for images",
+        },
+        404: {
+            "model": ErrorResponse,
+            "description": "File not found"
+        }
+    }
+)
+def probe_file(
+    file_id: str,
+    file_db: FileDB = Depends(get_file_db),
+    conv_db: ConversionDB = Depends(get_conversion_db),
+    comp_db: CompressionDB = Depends(get_compression_db),
+    current_user: dict = Depends(get_current_active_user),
+):
+    """Describe an uploaded, converted, or compressed file so clients can pick encode options."""
+    for db in [file_db, conv_db, comp_db]:
+        metadata = db.get_file_metadata(file_id)
+        if metadata is None:
+            continue
+        if metadata.get("user_id") != current_user["uuid"]:
+            raise HTTPException(status_code=404, detail="File not found")
+        file_path = Path(metadata["storage_path"])
+        validate_safe_path(file_path, raise_exception=True)
+
+        media_type = metadata["media_type"]
+        result: dict = {"id": file_id, "media_type": media_type, "kind": _probe_kind(media_type)}
+        if result["kind"] == "image":
+            image_info = _probe_image(file_path)
+            if image_info is None:
+                result["kind"] = "other"
+            else:
+                result["image"] = image_info
+        elif result["kind"] in ("audio", "video"):
+            info = probe_media(str(file_path))
+            if info is not None:
+                result.update(info.to_dict())
+        return result
     raise HTTPException(status_code=404, detail="File not found")
 
 @router.post(

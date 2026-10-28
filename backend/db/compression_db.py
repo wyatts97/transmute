@@ -1,8 +1,9 @@
 from core import get_settings, migrate_table_columns
+from .encode_metadata import EncodeMetadataMixin
 from .file_db import FileDB
 
 
-class CompressionDB(FileDB):
+class CompressionDB(EncodeMetadataMixin, FileDB):
     """Database class for managing compressed file metadata.
 
     Extends FileDB to store metadata for files that are the result of a
@@ -23,6 +24,7 @@ class CompressionDB(FileDB):
         """Initialize CompressionDB and create the compressions table."""
         super().__init__()
         self._ensure_compression_level_column()
+        self._ensure_encode_columns()
 
     def _ensure_compression_level_column(self) -> None:
         """Ensure the compression metadata table has the optional compression_level column."""
@@ -34,11 +36,14 @@ class CompressionDB(FileDB):
         """Create the compression metadata table with the compression_level column."""
         super().create_tables()
         self._ensure_compression_level_column()
+        self._ensure_encode_columns()
 
     def insert_file_metadata(self, metadata: dict) -> None:
         """Insert a new compression file metadata record, including optional compression_level."""
         compression_level = metadata.pop('compression_level', None)
+        options, preset, encoder_used = self._pop_encode_metadata(metadata)
         super().insert_file_metadata(metadata)
+        self._store_encode_metadata(metadata['id'], options, preset, encoder_used)
         if compression_level is not None:
             with self.conn:
                 self.conn.execute(

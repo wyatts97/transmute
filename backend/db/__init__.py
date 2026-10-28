@@ -12,6 +12,7 @@ from .default_compression_levels_db import DefaultCompressionLevelsDB
 from .user_db import UserDB, UserRole
 from .api_key_db import ApiKeyDB
 from .user_identity_db import UserIdentityDB
+from .preset_db import PresetDB
 
 __all__ = [
 	"FileDB",
@@ -30,4 +31,5 @@ __all__ = [
 	"UserRole",
 	"ApiKeyDB",
 	"UserIdentityDB",
+	"PresetDB",
 ]

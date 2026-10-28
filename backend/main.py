@@ -6,6 +6,7 @@ os.environ.setdefault("ORT_DISABLE_TELEMETRY", "1")
 from contextlib import asynccontextmanager
 import logging
 import re
+import threading
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse
@@ -14,6 +15,7 @@ from textwrap import dedent
 from api import router
 from api.routes.oidc import attach_session_middleware
 from core import build_logging_config, configure_logging, get_settings
+from encoding import get_capabilities
 from background import (
     get_conversion_worker_manager_thread,
     get_compression_worker_manager_thread,
@@ -87,6 +89,9 @@ def create_app() -> FastAPI:
         # lazy worker-spawning behavior.
         compression_worker_manager = get_compression_worker_manager_thread()
         compression_worker_manager.start()
+        # Detect encoders (including the VAAPI test encodes) in the
+        # background so the first request with options doesn't pay for it.
+        threading.Thread(target=get_capabilities, name="encoder-capabilities", daemon=True).start()
         yield
         # Daemon threads exit with the process; nothing to clean up here.
 

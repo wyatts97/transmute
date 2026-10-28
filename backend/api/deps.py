@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jwt import InvalidTokenError
 
 from core.auth import decode_access_token, verify_password
-from db import FileDB, ConversionDB, ConversionRelationsDB, ConversionJobDB, CompressionDB, CompressionRelationsDB, CompressionJobDB, SettingsDB, DefaultFormatsDB, DefaultQualitiesDB, DefaultCompressionLevelsDB, UserDB, ApiKeyDB, UserIdentityDB
+from db import FileDB, ConversionDB, ConversionRelationsDB, ConversionJobDB, CompressionDB, CompressionRelationsDB, CompressionJobDB, SettingsDB, DefaultFormatsDB, DefaultQualitiesDB, DefaultCompressionLevelsDB, UserDB, ApiKeyDB, UserIdentityDB, PresetDB
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/users/token")
 oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/api/users/token", auto_error=False)
@@ -250,3 +250,13 @@ def get_compression_job_db() -> CompressionJobDB:
 def get_default_compression_levels_db() -> DefaultCompressionLevelsDB:
     """Dependency that provides a shared DefaultCompressionLevelsDB instance."""
     return _default_compression_levels_db()
+
+
+@lru_cache(maxsize=1)
+def _preset_db() -> PresetDB:
+    return PresetDB()
+
+
+def get_preset_db() -> PresetDB:
+    """Dependency that provides a shared PresetDB instance."""
+    return _preset_db()

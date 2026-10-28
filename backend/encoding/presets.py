@@ -21,13 +21,14 @@ class BuiltinPreset:
     options: EncodeOptions
 
     def describe(self) -> dict:
+        """API shape (``PresetResponse``); built-ins use their key as ``id``."""
         return {
-            "key": self.key,
+            "id": self.key,
             "name": self.name,
             "description": self.description,
             "kind": self.kind,
             "builtin": True,
-            "options": self.options.model_dump(exclude_none=True, exclude_defaults=True),
+            "options": self.options.model_dump(mode="json", exclude_none=True, exclude_defaults=True),
         }
 
 

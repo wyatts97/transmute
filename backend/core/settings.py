@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     compression_jobs_table_name: str = "COMPRESSION_JOBS"
     app_settings_table_name: str = "APP_SETTINGS"
     custom_themes_table_name: str = "CUSTOM_THEMES"
+    presets_table_name: str = "USER_PRESETS"
     user_table_name: str = "USERS"
 
     # ===== Conversion queue =====

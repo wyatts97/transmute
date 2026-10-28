@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from registry import compressor_registry
 from core import get_settings, delete_file_and_metadata
-from db import CompressionDB, CompressionJobDB, FileDB, CompressionRelationsDB, SettingsDB, DefaultCompressionLevelsDB
-from services import CompressionFailedError, run_compression_job
+from db import CompressionDB, CompressionJobDB, FileDB, CompressionRelationsDB, SettingsDB, DefaultCompressionLevelsDB, PresetDB
+from encoding import EncodeOptionsError
+from services import CompressionFailedError, resolve_request_options, run_compression_job, validate_compression_options
 from api.deps import (
     get_current_active_user,
     get_file_db,
@@ -11,7 +12,9 @@ from api.deps import (
     get_compression_relations_db,
     get_settings_db,
     get_default_compression_levels_db,
+    get_preset_db,
 )
+from api.errors import options_validation_error
 from api.schemas import CompressionRequest, CompressionListResponse, FileMetadata, ErrorResponse, FileDeleteResponse
 
 
@@ -87,6 +90,7 @@ def create_compression(
     compression_relations_db: CompressionRelationsDB = Depends(get_compression_relations_db),
     settings_db: SettingsDB = Depends(get_settings_db),
     default_compression_levels_db: DefaultCompressionLevelsDB = Depends(get_default_compression_levels_db),
+    preset_db: PresetDB = Depends(get_preset_db),
     current_user: dict = Depends(get_current_active_user),
 ):
     """Create a new compression for a previously uploaded file."""
@@ -108,6 +112,18 @@ def create_compression(
         raise HTTPException(status_code=400, detail=f"No compressor found for {media_format}")
 
     try:
+        options = resolve_request_options(
+            preset=compression_request.preset,
+            options=compression_request.options,
+            user_id=current_user["uuid"],
+            preset_db=preset_db,
+        )
+        if options is not None:
+            validate_compression_options(compressor_type, media_format, compression_request.compression_level, options)
+    except EncodeOptionsError as exc:
+        raise options_validation_error(exc)
+
+    try:
         compressed_metadata = run_compression_job(
             source_metadata=og_metadata,
             compression_level=compression_request.compression_level,
@@ -118,6 +134,8 @@ def create_compression(
             compression_relations_db=compression_relations_db,
             settings_db=settings_db,
             default_compression_levels_db=default_compression_levels_db,
+            options=options,
+            preset=compression_request.preset if options is not None else None,
         )
     except CompressionFailedError as exc:
         raise HTTPException(status_code=400, detail=f"Compression failed: {exc}")

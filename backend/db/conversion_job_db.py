@@ -103,6 +103,13 @@ class ConversionJobDB:
             "started_at":         "TIMESTAMP",
             "completed_at":       "TIMESTAMP",
             "updated_at":         "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+            # Advanced encoding (fork additions): resolved options, the named
+            # preset they came from, and live progress details.
+            "options_json":       "TEXT",
+            "preset":             "TEXT",
+            "encoder_used":       "TEXT",
+            "eta_seconds":        "INTEGER",
+            "speed":              "REAL",
         })
 
         with self.conn:
@@ -127,7 +134,7 @@ class ConversionJobDB:
         Required keys: ``user_id``, ``source_file_id``, ``output_format``.
         Optional keys: ``id``, ``quality``, ``converter_name``,
         ``source_filename``, ``source_media_type``, ``source_extension``,
-        ``source_size_bytes``.
+        ``source_size_bytes``, ``options_json``, ``preset``.
         """
         required = {"user_id", "source_file_id", "output_format"}
         missing = required - metadata.keys()
@@ -159,6 +166,11 @@ class ConversionJobDB:
                     metadata.get("source_size_bytes"),
                 ),
             )
+            if metadata.get("options_json") is not None or metadata.get("preset") is not None:
+                self.conn.execute(
+                    f"UPDATE {self.TABLE_NAME} SET options_json = ?, preset = ? WHERE id = ?",  # nosec B608
+                    (metadata.get("options_json"), metadata.get("preset"), job_id),
+                )
 
         job = self.get_job(job_id)
         if job is None:
@@ -320,7 +332,7 @@ class ConversionJobDB:
         with self.conn:
             cursor = self.conn.execute(
                 f"UPDATE {self.TABLE_NAME} SET "  # nosec B608
-                f"status = ?, progress = 0, error_message = NULL, "
+                f"status = ?, progress = 0, error_message = NULL, eta_seconds = NULL, speed = NULL, encoder_used = NULL, "
                 f"output_file_id = NULL, started_at = NULL, completed_at = NULL, "
                 f"updated_at = CURRENT_TIMESTAMP "
                 f"WHERE id = ? AND user_id = ? AND status IN (?, ?)",
@@ -328,14 +340,44 @@ class ConversionJobDB:
             )
             return cursor.rowcount > 0
 
-    def update_progress(self, job_id: str, progress: int) -> None:
+    def update_progress(
+        self,
+        job_id: str,
+        progress: int,
+        eta_seconds: int | None = None,
+        speed: float | None = None,
+    ) -> None:
         progress = max(0, min(100, int(progress)))
         with self.conn:
             self.conn.execute(
                 f"UPDATE {self.TABLE_NAME} SET "  # nosec B608
-                f"progress = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (progress, job_id),
+                f"progress = ?, eta_seconds = ?, speed = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (progress, eta_seconds, speed, job_id),
             )
+
+    def set_encoder_used(self, job_id: str, encoder_used: str) -> None:
+        """Record which encoder produced the output (e.g. after a HW fallback)."""
+        with self.conn:
+            self.conn.execute(
+                f"UPDATE {self.TABLE_NAME} SET encoder_used = ? WHERE id = ?",  # nosec B608
+                (encoder_used, job_id),
+            )
+
+    def mark_cancelled(self, job_id: str) -> bool:
+        """Mark a running job cancelled after its encode was stopped.
+
+        Returns True when a row was updated, False if the job already left
+        the running state.
+        """
+        with self.conn:
+            cursor = self.conn.execute(
+                f"UPDATE {self.TABLE_NAME} SET "  # nosec B608
+                f"status = ?, eta_seconds = NULL, speed = NULL, "
+                f"completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP "
+                f"WHERE id = ? AND status = ?",
+                (STATUS_CANCELLED, job_id, STATUS_RUNNING),
+            )
+            return cursor.rowcount > 0
 
     def fail_running_jobs(self, error_message: str) -> int:
         """Mark every currently running job as failed.
@@ -364,7 +406,7 @@ class ConversionJobDB:
         with self.conn:
             cursor = self.conn.execute(
                 f"UPDATE {self.TABLE_NAME} SET "  # nosec B608
-                f"status = ?, progress = 0, error_message = NULL, "
+                f"status = ?, progress = 0, error_message = NULL, eta_seconds = NULL, speed = NULL, encoder_used = NULL, "
                 f"started_at = NULL, completed_at = NULL, updated_at = CURRENT_TIMESTAMP "
                 f"WHERE status = ?",
                 (STATUS_QUEUED, STATUS_RUNNING),

@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from api.deps import (
     get_current_active_user, get_current_admin_user, get_current_user_optional, get_user_db,
     get_api_key_db, get_file_db, get_conversion_db, get_conversion_relations_db, get_settings_db,
-    get_default_formats_db,
+    get_default_formats_db, get_preset_db,
 )
 from api.schemas import (
     ErrorResponse,
@@ -23,7 +23,7 @@ from api.schemas import (
 )
 from core import delete_file_and_metadata
 from core.auth import create_access_token, get_password_hash_str, verify_password
-from db import UserDB, ApiKeyDB, FileDB, ConversionDB, ConversionRelationsDB, SettingsDB, DefaultFormatsDB
+from db import UserDB, ApiKeyDB, FileDB, ConversionDB, ConversionRelationsDB, SettingsDB, DefaultFormatsDB, PresetDB
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -396,6 +396,7 @@ def delete_user(
     conversion_relations_db: ConversionRelationsDB = Depends(get_conversion_relations_db),
     settings_db: SettingsDB = Depends(get_settings_db),
     default_formats_db: DefaultFormatsDB = Depends(get_default_formats_db),
+    preset_db: PresetDB = Depends(get_preset_db),
 ):
     """Delete a user by UUID and cascade-remove all their data."""
     if user_uuid == current_user["uuid"]:
@@ -412,6 +413,7 @@ def delete_user(
         conversion_relations_db.delete_relation_by_converted(c["id"])
     settings_db.delete_settings(user_uuid)
     default_formats_db.delete_all(user_uuid)
+    preset_db.delete_all_for_user(user_uuid)
 
     if not db.delete_user(user_uuid):
         raise HTTPException(status_code=404, detail=f"No user found with uuid {user_uuid}")

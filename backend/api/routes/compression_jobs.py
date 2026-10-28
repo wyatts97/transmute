@@ -10,16 +10,21 @@ from api.deps import (
     get_compression_job_db,
     get_current_active_user,
     get_file_db,
+    get_preset_db,
 )
+from api.errors import options_validation_error
 from api.schemas import (
     CompressionJobCreateRequest,
     CompressionJobListResponse,
     CompressionJobResponse,
     ErrorResponse,
 )
+from background.encode_tracking import running_job_cancels, wait_for_job_to_stop
 from core import validate_safe_path
-from db import CompressionJobDB, FileDB
+from db import CompressionJobDB, FileDB, PresetDB
+from encoding import EncodeOptionsError
 from registry import compressor_registry
+from services import options_json_to_dict, options_to_json, resolve_request_options, validate_compression_options
 
 
 router = APIRouter(prefix="/compression-jobs", tags=["compression-jobs"])
@@ -41,6 +46,11 @@ def _serialize_job(job: dict) -> dict:
         "source_media_type": job.get("source_media_type"),
         "source_extension": job.get("source_extension"),
         "source_size_bytes": job.get("source_size_bytes"),
+        "preset": job.get("preset"),
+        "options": options_json_to_dict(job.get("options_json")),
+        "encoder_used": job.get("encoder_used"),
+        "eta_seconds": job.get("eta_seconds"),
+        "speed": job.get("speed"),
     }
     for ts_field in ("created_at", "started_at", "completed_at", "updated_at"):
         value = job.get(ts_field)
@@ -86,6 +96,7 @@ def create_job(
     request: CompressionJobCreateRequest,
     file_db: FileDB = Depends(get_file_db),
     job_db: CompressionJobDB = Depends(get_compression_job_db),
+    preset_db: PresetDB = Depends(get_preset_db),
     current_user: dict = Depends(get_current_active_user),
 ):
     """Validate the request and enqueue a new compression job."""
@@ -107,11 +118,25 @@ def create_job(
             detail=f"No compressor found for {media_format}",
         )
 
+    try:
+        options = resolve_request_options(
+            preset=request.preset,
+            options=request.options,
+            user_id=current_user["uuid"],
+            preset_db=preset_db,
+        )
+        if options is not None:
+            validate_compression_options(compressor_type, media_format, request.compression_level, options)
+    except EncodeOptionsError as exc:
+        raise options_validation_error(exc)
+
     job = job_db.insert_job({
         "user_id": current_user["uuid"],
         "source_file_id": source_id,
         "compression_level": request.compression_level,
         "compressor_name": compressor_type.__name__,
+        "options_json": options_to_json(options),
+        "preset": request.preset if options is not None else None,
         "source_filename": source.get("original_filename"),
         "source_media_type": media_format,
         "source_extension": source.get("extension"),
@@ -142,7 +167,7 @@ def get_job(
 
 @router.post(
     "/{job_id}/cancel",
-    summary="Cancel a queued compression job",
+    summary="Cancel a queued or running compression job",
     responses={
         200: {"model": CompressionJobResponse, "description": "Job cancelled"},
         404: {"model": ErrorResponse, "description": "Job not found"},
@@ -154,15 +179,24 @@ def cancel_job(
     job_db: CompressionJobDB = Depends(get_compression_job_db),
     current_user: dict = Depends(get_current_active_user),
 ):
-    """Cancel a job that has not yet started running.
+    """Cancel a queued job, or stop a running one.
 
-    Only ``queued -> cancelled`` is supported in this version. Cancelling a
-    running job is intentionally deferred; callers must wait for it to
-    complete or fail.
+    Queued jobs are cancelled immediately. Running jobs submitted with
+    advanced ``options`` or a ``preset`` are stopped mid-encode and end in
+    ``cancelled``; running legacy preset jobs return 409 and must finish.
     """
     job = job_db.get_job(job_id, user_id=current_user["uuid"])
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
+    if job["status"] == "running":
+        # Jobs on the advanced options path can be stopped mid-encode;
+        # legacy preset jobs still have to run to completion.
+        if not running_job_cancels.request_cancel(job_id):
+            raise HTTPException(
+                status_code=409,
+                detail="Cannot cancel job with status 'running'",
+            )
+        return _serialize_job(wait_for_job_to_stop(job_db, job_id, current_user["uuid"]))
     if job["status"] != "queued":
         raise HTTPException(
             status_code=409,

@@ -19,7 +19,7 @@ from encoding.legacy import (
     IMAGE_QUALITY_BY_LEVEL as _QUALITY_BY_LEVEL,
     legacy_image_compression_base,
 )
-from .compressor_interface import CompressorInterface
+from .compressor_interface import CompressorInterface, _normalize_compressor_media_type
 
 
 # JPEG 2000 uses quality_layers (PSNR-like). Lower = smaller file.
@@ -86,6 +86,13 @@ class PillowCompressor(CompressorInterface):
         """
         super().__init__(input_file, output_dir, media_type)
         HeifImagePlugin.register_heif_opener()
+
+    @classmethod
+    def validate_options(cls, media_type: str, compression_level: Optional[str], options: EncodeOptions) -> None:
+        """Raise ``EncodeOptionsError`` if ``options`` can't be applied (no file access)."""
+        media_type = _normalize_compressor_media_type(media_type)
+        merged = merge_options(legacy_image_compression_base(media_type, compression_level), options)
+        validate_image_options(media_type, merged)
 
     def can_compress(self) -> bool:
         """

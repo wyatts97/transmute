@@ -9,9 +9,9 @@ import threading
 
 from pathlib import Path
 from typing import Optional
-from .converter_interface import ConverterInterface
+from .converter_interface import ConverterInterface, _normalize_converter_media_type
 from core import get_settings, validate_safe_path
-from encoding import EncodeOptions, get_capabilities, merge_options, plan_av_encode
+from encoding import EncodeOptions, EncodeOptionsError, EncodePlan, get_capabilities, merge_options, plan_av_encode
 from encoding.ffmpeg_runner import ProgressCallback, run_encode_plan
 from encoding.legacy import (
     CONVERT_AC3_BITRATE_BY_QUALITY,
@@ -341,6 +341,27 @@ class FFmpegConverter(ConverterInterface):
         else:
             return cls.supported_output_formats - {fmt}
     
+    @classmethod
+    def plan_options(
+        cls,
+        output_type: str,
+        quality: Optional[str],
+        options: EncodeOptions,
+        caps=None,
+    ) -> tuple[EncodeOptions, EncodePlan]:
+        """Merge ``options`` over the quality preset and validate the result."""
+        output_type = _normalize_converter_media_type(output_type)
+        base = legacy_conversion_base(output_type, quality)
+        if base is None:
+            raise EncodeOptionsError(f"Advanced options aren't supported for {output_type} output yet")
+        merged = merge_options(base, options)
+        return merged, plan_av_encode(output_type, merged, caps or get_capabilities())
+
+    @classmethod
+    def validate_options(cls, input_type: str, output_type: str, quality: Optional[str], options: EncodeOptions) -> None:
+        """Raise ``EncodeOptionsError`` if ``options`` can't be applied (no file access)."""
+        cls.plan_options(output_type, quality, options)
+
     def _convert_with_options(
         self,
         *,
@@ -352,12 +373,8 @@ class FFmpegConverter(ConverterInterface):
     ) -> list[str]:
         """Convert with advanced options layered over the quality preset."""
         validate_safe_path(self.input_file)
-        base = legacy_conversion_base(self.output_type, quality)
-        if base is None:
-            raise ValueError(f"Advanced options aren't supported for {self.output_type} output yet")
-        merged = merge_options(base, options)
         caps = get_capabilities()
-        plan = plan_av_encode(self.output_type, merged, caps)
+        _, plan = self.plan_options(self.output_type, quality, options, caps)
 
         staged_input = self._stage_animated_webp_input()
         source = staged_input or self.input_file

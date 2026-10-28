@@ -24,6 +24,14 @@ This package powers the advanced `options` path for conversions and compressions
 - `image.py`: Pillow option validation and save-kwarg construction.
 - `presets.py`: built-in named presets (`amd-fast-hevc`, `discord-10mb`, ...).
 
+## API Surface
+
+- `options` and `preset` fields on `POST /api/jobs`, `/api/conversions`, `/api/compression-jobs` and `/api/compressions`. They are resolved by `services/encode_options.py` and stored on the job as `options_json`.
+- `GET /api/capabilities`, `GET|POST|PATCH|DELETE /api/presets`, and `GET /api/files/{id}/probe`.
+- Running option jobs report `progress`, `eta_seconds` and `speed`, record `encoder_used`, and can be cancelled (`background/encode_tracking.py`).
+- User-facing reference with examples: `docs/advanced-encoding.md`.
+- `tests/api/test_openapi_compat.py` fails on any breaking change against `tests/fixtures/openapi_upstream.json`.
+
 ## How To Work In This Folder
 
 - Never accept raw FFmpeg arguments. New knobs are new typed fields, range-checked in `options.py` and validated per encoder in `resolve.py`.

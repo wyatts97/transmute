@@ -1,12 +1,16 @@
-from typing import Literal, Optional
+from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, Field
+
+from encoding import EncodeOptions
 
 
 class ConversionRequest(BaseModel):
     id: str = Field(..., description="ID of file to convert", json_schema_extra={"example": "123e4567-e89b-12d3-a456-426614174000"})
     quality: Optional[str] = Field(None, description="Optional quality setting for conversion (e.g. low, medium, high)", json_schema_extra={"example": "medium"})
     output_format: str = Field(..., description="Target format for conversion", json_schema_extra={"example": "png"})
+    options: Optional[EncodeOptions] = Field(None, description="Advanced encoder options (codec, rate control, resize, ...). Layered over `preset` and the legacy quality setting. See GET /api/capabilities. Omit for the classic behavior")
+    preset: Optional[str] = Field(None, max_length=64, description="Built-in preset key or saved preset id from GET /api/presets", json_schema_extra={"example": "web-1080p-h264"})
 
 
 ConversionJobStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
@@ -16,6 +20,8 @@ class ConversionJobCreateRequest(BaseModel):
     id: str = Field(..., description="ID of the source file to convert", json_schema_extra={"example": "123e4567-e89b-12d3-a456-426614174000"})
     output_format: str = Field(..., description="Target format for conversion", json_schema_extra={"example": "png"})
     quality: Optional[str] = Field(None, description="Optional quality setting (e.g. low, medium, high)", json_schema_extra={"example": "medium"})
+    options: Optional[EncodeOptions] = Field(None, description="Advanced encoder options (codec, rate control, resize, ...). Layered over `preset` and the legacy quality setting. See GET /api/capabilities. Omit for the classic behavior")
+    preset: Optional[str] = Field(None, max_length=64, description="Built-in preset key or saved preset id from GET /api/presets", json_schema_extra={"example": "web-1080p-h264"})
 
 
 class ConversionJobResponse(BaseModel):
@@ -37,6 +43,11 @@ class ConversionJobResponse(BaseModel):
     started_at: Optional[str] = Field(None, description="Time the worker began processing")
     completed_at: Optional[str] = Field(None, description="Time the job reached a terminal status")
     updated_at: Optional[str] = Field(None, description="Last update timestamp")
+    preset: Optional[str] = Field(None, description="Preset key or id the job was submitted with")
+    options: Optional[EncodeOptions] = Field(None, description="Resolved advanced options (preset merged with request options) the job runs with")
+    encoder_used: Optional[str] = Field(None, description="Encoder that produced the output, e.g. `hevc_vaapi`, or `libx265` after a hardware fallback")
+    eta_seconds: Optional[int] = Field(None, description="Estimated seconds remaining while running (advanced options jobs)")
+    speed: Optional[float] = Field(None, description="Encode speed as a multiple of real time while running (advanced options jobs)")
 
 
 class ConversionJobListResponse(BaseModel):
@@ -67,6 +78,9 @@ class ConversionItem(BaseModel):
     size_bytes: int = Field(..., json_schema_extra={"example": 204800})
     sha256_checksum: str = Field(..., json_schema_extra={"example": "abc123def456..."})
     quality: Optional[str] = Field(None, description="Quality setting used for this conversion", json_schema_extra={"example": "medium"})
+    preset: Optional[str] = Field(None, description="Preset key or id used, if any")
+    options: Optional[EncodeOptions] = Field(None, description="Resolved advanced options used, if any")
+    encoder_used: Optional[str] = Field(None, description="Encoder that produced this file, when advanced options were used")
     original_file: Optional[FileMetadata] = Field(None, description="Original file metadata")
 
 
@@ -250,6 +264,8 @@ class DefaultQualityListResponse(BaseModel):
 class CompressionRequest(BaseModel):
     id: str = Field(..., description="ID of file to compress", json_schema_extra={"example": "123e4567-e89b-12d3-a456-426614174000"})
     compression_level: Optional[str] = Field(None, description="Optional compression-level preset (e.g. light, balanced, max)", json_schema_extra={"example": "balanced"})
+    options: Optional[EncodeOptions] = Field(None, description="Advanced encoder options (codec, rate control, resize, ...). Layered over `preset` and the legacy quality setting. See GET /api/capabilities. Omit for the classic behavior")
+    preset: Optional[str] = Field(None, max_length=64, description="Built-in preset key or saved preset id from GET /api/presets", json_schema_extra={"example": "web-1080p-h264"})
 
 
 CompressionJobStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
@@ -258,6 +274,8 @@ CompressionJobStatus = Literal["queued", "running", "completed", "failed", "canc
 class CompressionJobCreateRequest(BaseModel):
     id: str = Field(..., description="ID of the source file to compress", json_schema_extra={"example": "123e4567-e89b-12d3-a456-426614174000"})
     compression_level: Optional[str] = Field(None, description="Optional compression-level preset (e.g. light, balanced, max)", json_schema_extra={"example": "balanced"})
+    options: Optional[EncodeOptions] = Field(None, description="Advanced encoder options (codec, rate control, resize, ...). Layered over `preset` and the legacy quality setting. See GET /api/capabilities. Omit for the classic behavior")
+    preset: Optional[str] = Field(None, max_length=64, description="Built-in preset key or saved preset id from GET /api/presets", json_schema_extra={"example": "web-1080p-h264"})
 
 
 class CompressionJobResponse(BaseModel):
@@ -278,6 +296,11 @@ class CompressionJobResponse(BaseModel):
     started_at: Optional[str] = Field(None, description="Time the worker began processing")
     completed_at: Optional[str] = Field(None, description="Time the job reached a terminal status")
     updated_at: Optional[str] = Field(None, description="Last update timestamp")
+    preset: Optional[str] = Field(None, description="Preset key or id the job was submitted with")
+    options: Optional[EncodeOptions] = Field(None, description="Resolved advanced options (preset merged with request options) the job runs with")
+    encoder_used: Optional[str] = Field(None, description="Encoder that produced the output, e.g. `hevc_vaapi`, or `libx265` after a hardware fallback")
+    eta_seconds: Optional[int] = Field(None, description="Estimated seconds remaining while running (advanced options jobs)")
+    speed: Optional[float] = Field(None, description="Encode speed as a multiple of real time while running (advanced options jobs)")
 
 
 class CompressionJobListResponse(BaseModel):
@@ -292,6 +315,9 @@ class CompressionItem(BaseModel):
     size_bytes: int = Field(..., json_schema_extra={"example": 102400})
     sha256_checksum: str = Field(..., json_schema_extra={"example": "abc123def456..."})
     compression_level: Optional[str] = Field(None, description="Compression-level preset used for this compression", json_schema_extra={"example": "balanced"})
+    preset: Optional[str] = Field(None, description="Preset key or id used, if any")
+    options: Optional[EncodeOptions] = Field(None, description="Resolved advanced options used, if any")
+    encoder_used: Optional[str] = Field(None, description="Encoder that produced this file, when advanced options were used")
     original_file: Optional[FileMetadata] = Field(None, description="Original file metadata")
 
 
@@ -408,3 +434,124 @@ class StatsResponse(BaseModel):
     total_output_files: int = Field(..., description="Total output files produced across all users (conversions + compressions)", json_schema_extra={"example": 30})
     total_storage_bytes: int = Field(..., description="Total storage used in bytes across all users", json_schema_extra={"example": 104857600})
     users: list[UserStatsItem] = Field(..., description="Per-user breakdown of stats")
+
+
+# ── Advanced encoding ───────────────────────────────────────────────
+
+class PresetResponse(BaseModel):
+    id: str = Field(..., description="Built-in preset key or saved preset UUID; pass it as `preset` on a job", json_schema_extra={"example": "web-1080p-h264"})
+    name: str = Field(..., description="Display name", json_schema_extra={"example": "Web 1080p H.264"})
+    description: Optional[str] = Field(None, description="What the preset does")
+    kind: Literal["video", "image"] = Field(..., description="Media the preset targets")
+    builtin: bool = Field(..., description="Built-in presets are read-only")
+    options: EncodeOptions = Field(..., description="Options the preset applies")
+    created_at: Optional[str] = Field(None, description="Creation timestamp (saved presets)")
+    updated_at: Optional[str] = Field(None, description="Last update timestamp (saved presets)")
+
+
+class PresetListResponse(BaseModel):
+    presets: list[PresetResponse] = Field(..., description="Built-in presets followed by the current user's saved presets")
+
+
+class PresetCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=64, description="Display name", json_schema_extra={"example": "Plex 1080p"})
+    description: Optional[str] = Field(None, max_length=280, description="Optional description")
+    kind: Literal["video", "image"] = Field(..., description="Media the preset targets")
+    options: EncodeOptions = Field(..., description="Options the preset applies")
+
+
+class PresetUpdateRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=64, description="New display name")
+    description: Optional[str] = Field(None, max_length=280, description="New description")
+    kind: Optional[Literal["video", "image"]] = Field(None, description="New media kind")
+    options: Optional[EncodeOptions] = Field(None, description="Replacement options")
+
+
+class VideoEncoderInfo(BaseModel):
+    name: str = Field(..., json_schema_extra={"example": "hevc_vaapi"})
+    codec: str = Field(..., json_schema_extra={"example": "hevc"})
+    hardware: Optional[str] = Field(None, description="Hardware API (`vaapi`) or null for software encoders")
+    rate_controls: list[str] = Field(..., description="Accepted `rate_control` values")
+    quality_param: Literal["crf", "qp"] = Field(..., description="Option that sets constant quality for this encoder")
+    quality_range: list[int] = Field(..., description="Inclusive [min, max] for the quality parameter")
+    default_quality: int = Field(..., description="Quality used when none is given")
+    presets: list[Union[int, str]] = Field(..., description="Accepted `encoder_preset` values")
+    default_preset: Optional[Union[int, str]] = Field(None, description="Preset used when none is given")
+    tunes: list[str] = Field(..., description="Accepted `tune` values")
+    bit_depths: list[int] = Field(..., description="Supported output bit depths")
+    two_pass: bool = Field(..., description="Whether `target_size` runs a two-pass encode")
+
+
+class HardwareInfo(BaseModel):
+    vaapi_device: Optional[str] = Field(None, description="Render node used for VAAPI, when a hardware encoder passed its test encode")
+    encoders: list[str] = Field(..., description="Hardware encoders verified usable on this host")
+
+
+class ContainerInfo(BaseModel):
+    format: str = Field(..., json_schema_extra={"example": "mkv"})
+    kind: Literal["video", "audio"]
+    video_codecs: list[str] = Field(..., description="Video codecs this container accepts with `options`")
+    audio_codecs: list[str] = Field(..., description="Audio codecs this container accepts with `options`")
+    default_video: Optional[str] = Field(None, description="Video codec used when none is given")
+    default_audio: Optional[str] = Field(None, description="Audio codec used when none is given")
+    subtitle_copy: bool = Field(..., description="Whether `subtitles: copy` is supported")
+
+
+class ImageFormatInfo(BaseModel):
+    format: str = Field(..., json_schema_extra={"example": "webp"})
+    quality: bool = Field(..., description="Accepts `image.quality`")
+    lossless: bool = Field(..., description="Accepts `image.lossless`")
+    effort: bool = Field(..., description="Accepts `image.effort`")
+    chroma_subsampling: bool = Field(..., description="Accepts `image.chroma_subsampling`")
+    palette_colors: bool = Field(..., description="Accepts `image.palette_colors`")
+
+
+class CapabilitiesResponse(BaseModel):
+    ffmpeg_version: Optional[str] = Field(None, description="Detected FFmpeg version")
+    hardware: HardwareInfo
+    video_encoders: list[VideoEncoderInfo] = Field(..., description="Video encoders usable with `options.video.encoder`")
+    default_video_encoders: dict[str, Optional[str]] = Field(..., description="Encoder chosen for each codec when no encoder is given")
+    audio_codecs: list[str] = Field(..., description="Audio codecs usable with `options.audio.codec`")
+    containers: list[ContainerInfo] = Field(..., description="Output formats that accept audio/video `options`")
+    image_formats: list[ImageFormatInfo] = Field(..., description="Image outputs and which `options.image` fields they accept")
+    presets: list[PresetResponse] = Field(..., description="Built-in presets")
+
+
+class ProbeVideoStream(BaseModel):
+    codec: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    fps: Optional[float] = None
+    pix_fmt: Optional[str] = None
+    bit_depth: Optional[int] = None
+
+
+class ProbeAudioStream(BaseModel):
+    codec: Optional[str] = None
+    channels: Optional[int] = None
+    sample_rate: Optional[int] = None
+    bitrate_kbps: Optional[int] = None
+
+
+class ProbeImage(BaseModel):
+    width: int
+    height: int
+    mode: str = Field(..., description="Pillow color mode, e.g. RGB, RGBA")
+    format: Optional[str] = Field(None, description="Detected image format")
+    frames: int = Field(1, description="Frame count for animated images")
+    has_exif: bool
+    has_icc: bool
+
+
+class FileProbeResponse(BaseModel):
+    id: str = Field(..., description="File ID")
+    media_type: str = Field(..., json_schema_extra={"example": "mkv"})
+    kind: Literal["video", "audio", "image", "other"] = Field(..., description="Broad media kind")
+    duration_s: Optional[float] = Field(None, description="Duration in seconds (audio/video)")
+    bitrate_kbps: Optional[int] = Field(None, description="Overall bitrate (audio/video)")
+    container: Optional[str] = Field(None, description="Container name reported by ffprobe")
+    video: Optional[ProbeVideoStream] = None
+    audio: list[ProbeAudioStream] = Field(default_factory=list)
+    subtitle_count: int = 0
+    image: Optional[ProbeImage] = None
+

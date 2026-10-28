@@ -1,0 +1,5975 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Transmute API",
+    "description": "API to interact with Transmute without the need for a frontend.\n\n## Authentication\n\n### Getting an API key\n\nAuthenticate with your user account first, then create a key under 'My Account' -> 'API Keys'.\nThe generated key is shown exactly once, so store it safely after creation.\n\n### Using an API key\n\nFor any endpoint that expects bearer authentication, send your API key in the `Authorization` header:\n\n```http\nAuthorization: Bearer <your-api-key>\n```\n\nThe API accepts either a JWT bearer token for authenticated users through the web interface,\nor an API key for programmatic access anywhere bearer auth is required.",
+    "version": "dev"
+  },
+  "servers": [
+    {
+      "url": "http://0.0.0.0:3313",
+      "description": "Transmute API server"
+    }
+  ],
+  "paths": {
+    "/api/health/info": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Get application metadata",
+        "description": "Return application metadata",
+        "operationId": "app_info_api_health_info_get",
+        "responses": {
+          "200": {
+            "description": "Application metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health/live": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Liveness check",
+        "description": "Simple liveness check to confirm the server is running",
+        "operationId": "liveness_api_health_live_get",
+        "responses": {
+          "200": {
+            "description": "Liveness status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health/ready": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Readiness check",
+        "description": "Readiness check to confirm the server is ready to handle requests",
+        "operationId": "readiness_api_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Ready - all checks passed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Not ready - one or more checks failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "List all uploaded files",
+        "description": "List all uploaded files for the current user",
+        "operationId": "list_files_api_files_get",
+        "responses": {
+          "200": {
+            "description": "List of all uploaded files",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Upload a file",
+        "description": "Upload a file and save it to the server",
+        "operationId": "upload_file_api_files_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_file_api_files_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "File uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "File has no supported conversions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Upload failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/files/url": {
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Upload one or more files from a URL",
+        "operationId": "upload_file_from_url_api_files_url_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UrlUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "File(s) downloaded and uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUrlUploadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "URL download failed or file has no supported conversions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Upload failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/files/{file_id}": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Download a file (either converted or original) based on file ID",
+        "description": "Download a file",
+        "operationId": "get_file_api_files__file_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File content as binary",
+            "content": {
+              "application/octet-stream": {}
+            }
+          },
+          "404": {
+            "description": "File not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Download a file (either converted or original) based on file ID",
+        "description": "Download a file",
+        "operationId": "get_file_api_files__file_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File content as binary",
+            "content": {
+              "application/octet-stream": {}
+            }
+          },
+          "404": {
+            "description": "File not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Delete an uploaded file",
+        "description": "Delete an uploaded file",
+        "operationId": "delete_file_api_files__file_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDeleteResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "File not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files/batch": {
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Batch download converted files",
+        "description": "Batch download converted files as a ZIP archive",
+        "operationId": "batch_download_files_api_files_batch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchDownloadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "ZIP file containing all converted files",
+            "content": {
+              "application/zip": {}
+            }
+          },
+          "404": {
+            "description": "One or more converted files not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/files/all": {
+      "delete": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Delete all uploaded files",
+        "description": "Delete all uploaded files for the current user",
+        "operationId": "delete_all_files_api_files_all_delete",
+        "responses": {
+          "200": {
+            "description": "All files deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDeleteResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/files/config/upload": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Get upload configuration",
+        "description": "Return upload-related configuration values.",
+        "operationId": "get_upload_config_api_files_config_upload_get",
+        "responses": {
+          "200": {
+            "description": "Upload configuration including maximum chunk size",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadConfigResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/files/upload/init": {
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Initialize a chunked upload session",
+        "description": "Create a new chunked upload session and return an upload ID.",
+        "operationId": "init_chunked_upload_api_files_upload_init_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChunkedUploadInitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Chunked upload session initialized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChunkedUploadInitResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/files/upload/chunk": {
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Upload a single chunk",
+        "description": "Receive and store a single chunk for a chunked upload session.",
+        "operationId": "upload_chunk_api_files_upload_chunk_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "upload_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Upload Id"
+            }
+          },
+          {
+            "name": "chunk_index",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Chunk Index"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chunk received",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChunkedUploadChunkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid chunk index or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Upload session not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files/upload/complete": {
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Finalize a chunked upload",
+        "description": "Assemble all chunks into the final file, validate, and store metadata.",
+        "operationId": "complete_chunked_upload_api_files_upload_complete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChunkedUploadCompleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "File assembled and uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing chunks or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Upload session not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "File has no supported conversions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Upload finalization failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/conversions/complete": {
+      "get": {
+        "tags": [
+          "conversions"
+        ],
+        "summary": "List completed conversions",
+        "description": "List all completed conversions for the current user.",
+        "operationId": "list_conversions_api_conversions_complete_get",
+        "responses": {
+          "200": {
+            "description": "List of completed conversions with original and converted file metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversionListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/conversions": {
+      "post": {
+        "tags": [
+          "conversions"
+        ],
+        "summary": "Create a new conversion",
+        "description": "Create a new conversion for a previously uploaded file.",
+        "operationId": "create_conversion_api_conversions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful conversion - returns metadata of the converted file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileMetadata"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or conversion error (no converter found)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "File not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/conversions/all": {
+      "delete": {
+        "tags": [
+          "conversions"
+        ],
+        "summary": "Delete all converted files and their relations to the original files",
+        "description": "Delete all converted files and their relations for the current user",
+        "operationId": "delete_all_conversions_api_conversions_all_delete",
+        "responses": {
+          "200": {
+            "description": "Conversion history deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDeleteResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/conversions/{conversion_id}": {
+      "delete": {
+        "tags": [
+          "conversions"
+        ],
+        "summary": "Delete a converted file and its relation to the original file",
+        "description": "Delete a converted file and its relation",
+        "operationId": "delete_conversion_api_conversions__conversion_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversion Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversion history deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDeleteResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conversion history not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/converters": {
+      "get": {
+        "tags": [
+          "converters"
+        ],
+        "summary": "List all available converters",
+        "operationId": "list_converters_api_converters_get",
+        "responses": {
+          "200": {
+            "description": "List of converters with supported input and output formats",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConverterMetadataListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/compressors": {
+      "get": {
+        "tags": [
+          "compressors"
+        ],
+        "summary": "List all available compressors",
+        "operationId": "list_compressors_api_compressors_get",
+        "responses": {
+          "200": {
+            "description": "List of compressors with the formats and compression levels they support",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompressorMetadataListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/jobs": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "List conversion jobs for the current user",
+        "description": "List the current user's conversion jobs, newest-first.\n\nOptional ``status_filter`` query parameter narrows the result to one of:\n``queued``, ``running``, ``completed``, ``failed``, ``cancelled``.",
+        "operationId": "list_jobs_api_jobs_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status_filter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status Filter"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of conversion jobs newest-first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversionJobListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Submit a new conversion job",
+        "description": "Validate the request and enqueue a new conversion job.",
+        "operationId": "create_job_api_jobs_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversionJobCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Job queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversionJobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unsupported conversion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source file not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Get a single conversion job",
+        "description": "Get one of the current user's jobs by ID.",
+        "operationId": "get_job_api_jobs__job_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The requested job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversionJobResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Delete a terminal conversion job",
+        "description": "Delete a job that has reached a terminal state.\n\nOnly ``failed`` and ``cancelled`` jobs may be removed via this endpoint.\nCompleted jobs are represented in the conversions list and removed via\n``DELETE /api/conversions/{id}``; queued/running jobs must be cancelled\nfirst.",
+        "operationId": "delete_job_api_jobs__job_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Job deleted"
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Job is still active",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/cancel": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Cancel a queued conversion job",
+        "description": "Cancel a job that has not yet started running.\n\nOnly ``queued -> cancelled`` is supported in this version. Cancelling a\nrunning job is intentionally deferred; callers must wait for it to\ncomplete or fail.",
+        "operationId": "cancel_job_api_jobs__job_id__cancel_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversionJobResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Job is no longer cancellable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/retry": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Retry a failed or cancelled conversion job",
+        "description": "Re-queue a job that previously ended in ``failed`` or ``cancelled``.\n\nThe source file must still exist and be owned by the caller \u2014 if the\noriginal was deleted (e.g. ``keep_originals=false``) the retry is rejected\nwith a 404 so the user can re-upload before trying again.",
+        "operationId": "retry_job_api_jobs__job_id__retry_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job re-queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversionJobResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job or source file not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Job is not in a retryable state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compressions/complete": {
+      "get": {
+        "tags": [
+          "compressions"
+        ],
+        "summary": "List completed compressions",
+        "description": "List all completed compressions for the current user.",
+        "operationId": "list_compressions_api_compressions_complete_get",
+        "responses": {
+          "200": {
+            "description": "List of completed compressions with original and compressed file metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompressionListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/compressions": {
+      "post": {
+        "tags": [
+          "compressions"
+        ],
+        "summary": "Create a new compression",
+        "description": "Create a new compression for a previously uploaded file.",
+        "operationId": "create_compression_api_compressions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompressionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful compression - returns metadata of the compressed file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileMetadata"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or compression error (no compressor found)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "File not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/compressions/all": {
+      "delete": {
+        "tags": [
+          "compressions"
+        ],
+        "summary": "Delete all compressed files and their relations to the original files",
+        "description": "Delete all compressed files and their relations for the current user",
+        "operationId": "delete_all_compressions_api_compressions_all_delete",
+        "responses": {
+          "200": {
+            "description": "Compression history deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDeleteResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/compressions/{compression_id}": {
+      "delete": {
+        "tags": [
+          "compressions"
+        ],
+        "summary": "Delete a compressed file and its relation to the original file",
+        "description": "Delete a compressed file and its relation",
+        "operationId": "delete_compression_api_compressions__compression_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "compression_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Compression Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Compression history deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDeleteResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Compression history not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compression-jobs": {
+      "get": {
+        "tags": [
+          "compression-jobs"
+        ],
+        "summary": "List compression jobs for the current user",
+        "description": "List the current user's compression jobs, newest-first.\n\nOptional ``status_filter`` query parameter narrows the result to one of:\n``queued``, ``running``, ``completed``, ``failed``, ``cancelled``.",
+        "operationId": "list_jobs_api_compression_jobs_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status_filter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status Filter"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of compression jobs newest-first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompressionJobListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "compression-jobs"
+        ],
+        "summary": "Submit a new compression job",
+        "description": "Validate the request and enqueue a new compression job.",
+        "operationId": "create_job_api_compression_jobs_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompressionJobCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Job queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompressionJobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unsupported compression",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source file not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compression-jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "compression-jobs"
+        ],
+        "summary": "Get a single compression job",
+        "description": "Get one of the current user's jobs by ID.",
+        "operationId": "get_job_api_compression_jobs__job_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The requested job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompressionJobResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "compression-jobs"
+        ],
+        "summary": "Delete a terminal compression job",
+        "description": "Delete a job that has reached a terminal state.\n\nOnly ``failed`` and ``cancelled`` jobs may be removed via this endpoint.\nCompleted jobs are represented in the compressions list and removed via\n``DELETE /api/compressions/{id}``; queued/running jobs must be cancelled\nfirst.",
+        "operationId": "delete_job_api_compression_jobs__job_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Job deleted"
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Job is still active",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compression-jobs/{job_id}/cancel": {
+      "post": {
+        "tags": [
+          "compression-jobs"
+        ],
+        "summary": "Cancel a queued compression job",
+        "description": "Cancel a job that has not yet started running.\n\nOnly ``queued -> cancelled`` is supported in this version. Cancelling a\nrunning job is intentionally deferred; callers must wait for it to\ncomplete or fail.",
+        "operationId": "cancel_job_api_compression_jobs__job_id__cancel_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompressionJobResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Job is no longer cancellable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compression-jobs/{job_id}/retry": {
+      "post": {
+        "tags": [
+          "compression-jobs"
+        ],
+        "summary": "Retry a failed or cancelled compression job",
+        "description": "Re-queue a job that previously ended in ``failed`` or ``cancelled``.\n\nThe source file must still exist and be owned by the caller \u2014 if the\noriginal was deleted (e.g. ``keep_originals=false``) the retry is rejected\nwith a 404 so the user can re-upload before trying again.",
+        "operationId": "retry_job_api_compression_jobs__job_id__retry_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job re-queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompressionJobResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job or source file not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Job is not in a retryable state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/default-compression-levels": {
+      "get": {
+        "tags": [
+          "default-compression-levels"
+        ],
+        "summary": "Get all default compression-level mappings",
+        "description": "Return all user-configured default compression-level mappings.",
+        "operationId": "get_default_compression_levels_api_default_compression_levels_get",
+        "responses": {
+          "200": {
+            "description": "List of default compression-level mappings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefaultCompressionLevelListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "default-compression-levels"
+        ],
+        "summary": "Set a default compression-level mapping",
+        "description": "Create or update a default compression level for a given media format.",
+        "operationId": "upsert_default_compression_level_api_default_compression_levels_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DefaultCompressionLevelMapping"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The created or updated mapping",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefaultCompressionLevelMapping"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/default-compression-levels/{media_format}": {
+      "delete": {
+        "tags": [
+          "default-compression-levels"
+        ],
+        "summary": "Delete a default compression-level mapping",
+        "description": "Remove a default compression-level mapping for the given media format.",
+        "operationId": "delete_default_compression_level_api_default_compression_levels__media_format__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "media_format",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Media Format"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mapping deleted",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Mapping not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get app settings",
+        "description": "Return the current user's application settings.\n\nCleanup settings are always sourced from the first admin's row,\nsince they are a system-wide concern managed by administrators.",
+        "operationId": "get_app_settings_api_settings_get",
+        "responses": {
+          "200": {
+            "description": "Current app settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppSettingsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Update app settings",
+        "description": "Partially update the current user's settings. Only provided fields are changed.\n\nCleanup settings (cleanup_enabled, cleanup_ttl_minutes) are admin-only.",
+        "operationId": "update_app_settings_api_settings_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated app settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppSettingsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid settings value"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/settings/themes": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "List custom themes",
+        "description": "Return every custom theme registered in the database.\n\nAvailable to any authenticated user so the frontend can render the\ntheme picker. The built-in keys are returned alongside so the client\nknows which entries are statically defined in CSS.",
+        "operationId": "list_custom_themes_api_settings_themes_get",
+        "responses": {
+          "200": {
+            "description": "All custom themes plus the built-in theme keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomThemeListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Create a custom theme (admin only)",
+        "description": "Admin-only endpoint to register a new theme available to every user.",
+        "operationId": "create_custom_theme_api_settings_themes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomThemeCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created theme",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomThemeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid theme payload"
+          },
+          "403": {
+            "description": "Admin role required"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/settings/themes/{key}": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Update a custom theme (admin only)",
+        "description": "Admin-only endpoint that replaces the display name and/or color tokens of an existing theme.",
+        "operationId": "update_custom_theme_api_settings_themes__key__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomThemeUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated theme",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomThemeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid theme payload"
+          },
+          "403": {
+            "description": "Admin role required"
+          },
+          "404": {
+            "description": "Theme not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Delete a custom theme (admin only)",
+        "description": "Admin-only endpoint. Any user currently selecting this theme is reset to `rubedo`.",
+        "operationId": "delete_custom_theme_api_settings_themes__key__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Theme deleted"
+          },
+          "403": {
+            "description": "Admin role required"
+          },
+          "404": {
+            "description": "Theme not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/default-formats": {
+      "get": {
+        "tags": [
+          "default-formats"
+        ],
+        "summary": "Get all default format mappings",
+        "description": "Return all user-configured default format mappings.",
+        "operationId": "get_default_formats_api_default_formats_get",
+        "responses": {
+          "200": {
+            "description": "List of default format mappings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefaultFormatListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "default-formats"
+        ],
+        "summary": "Set a default format mapping",
+        "description": "Create or update a default output format for a given input format.",
+        "operationId": "upsert_default_format_api_default_formats_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DefaultFormatMapping"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The created or updated mapping",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefaultFormatMapping"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/default-formats/{input_format}": {
+      "delete": {
+        "tags": [
+          "default-formats"
+        ],
+        "summary": "Delete a default format mapping",
+        "description": "Remove a default format mapping for the given input format.",
+        "operationId": "delete_default_format_api_default_formats__input_format__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "input_format",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Input Format"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mapping deleted",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Mapping not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/default-qualities": {
+      "get": {
+        "tags": [
+          "default-qualities"
+        ],
+        "summary": "Get all default quality mappings",
+        "description": "Return all user-configured default quality mappings.",
+        "operationId": "get_default_qualities_api_default_qualities_get",
+        "responses": {
+          "200": {
+            "description": "List of default quality mappings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefaultQualityListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "default-qualities"
+        ],
+        "summary": "Set a default quality mapping",
+        "description": "Create or update a default quality for a given output format.",
+        "operationId": "upsert_default_quality_api_default_qualities_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DefaultQualityMapping"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The created or updated mapping",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefaultQualityMapping"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/default-qualities/{output_format}": {
+      "delete": {
+        "tags": [
+          "default-qualities"
+        ],
+        "summary": "Delete a default quality mapping",
+        "description": "Remove a default quality mapping for the given output format.",
+        "operationId": "delete_default_quality_api_default_qualities__output_format__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "output_format",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Output Format"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mapping deleted",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Mapping not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/bootstrap-status": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Get bootstrap status",
+        "description": "Return whether the application still needs its first admin account.",
+        "operationId": "get_bootstrap_status_api_users_bootstrap_status_get",
+        "responses": {
+          "200": {
+            "description": "Whether first-time user setup is required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserBootstrapStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "List all users",
+        "description": "Return all users without exposing password hashes.",
+        "operationId": "list_users_api_users_get",
+        "responses": {
+          "200": {
+            "description": "List of users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Create a user",
+        "description": "Create a new user and hash the provided password before storage.",
+        "operationId": "create_user_api_users_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Username already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/users/token": {
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Issue an OAuth2 bearer token",
+        "description": "Issue a JWT bearer token using the OAuth2 password flow form.",
+        "operationId": "issue_token_api_users_token_post",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_issue_token_api_users_token_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Token issued successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserAuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User account is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/authenticate": {
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Authenticate a user",
+        "description": "Validate username and password and issue a JWT bearer token.",
+        "operationId": "authenticate_user_api_users_authenticate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserAuthRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication succeeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserAuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User account is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/me": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Get the authenticated user",
+        "description": "Return the authenticated user derived from the bearer token.",
+        "operationId": "get_me_api_users_me_get",
+        "responses": {
+          "200": {
+            "description": "Current authenticated user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User account is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Update the authenticated user",
+        "description": "Allow a user to update their own account except for role changes.",
+        "operationId": "update_me_api_users_me_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserSelfUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated current user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Username already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/users/{user_uuid}": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Get a user by UUID",
+        "description": "Return a user by UUID without exposing the password hash.",
+        "operationId": "get_user_api_users__user_uuid__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Update a user",
+        "description": "Partially update a user, hashing a replacement password when provided.",
+        "operationId": "update_user_api_users__user_uuid__patch",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Username already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Delete a user",
+        "description": "Delete a user by UUID and cascade-remove all their data.",
+        "operationId": "delete_user_api_users__user_uuid__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDeleteResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/api-keys": {
+      "get": {
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "List API keys for the current user",
+        "description": "Return all API keys belonging to the authenticated user (without hashes).",
+        "operationId": "list_api_keys_api_api_keys_get",
+        "responses": {
+          "200": {
+            "description": "List of API keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeyListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "Create an API key",
+        "description": "Generate a new API key for the authenticated user.\n\nThe raw key is returned exactly once in this response and is never stored.",
+        "operationId": "create_api_key_api_api_keys_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiKeyCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "API key created (raw key shown once)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeyCreatedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/api-keys/{key_id}": {
+      "delete": {
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "Delete an API key",
+        "description": "Delete one of the authenticated user's API keys.",
+        "operationId": "delete_api_key_api_api_keys__key_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "API key deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeyDeleteResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API key not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/oidc/config": {
+      "get": {
+        "tags": [
+          "oidc"
+        ],
+        "summary": "Get OIDC configuration for the frontend",
+        "description": "Return whether OIDC is available and its display name (no secrets).",
+        "operationId": "oidc_config_api_oidc_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/oidc/login": {
+      "get": {
+        "tags": [
+          "oidc"
+        ],
+        "summary": "Start OIDC login flow",
+        "description": "Redirect the user to the OIDC provider's authorization endpoint.",
+        "operationId": "oidc_login_api_oidc_login_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/oidc/callback": {
+      "get": {
+        "tags": [
+          "oidc"
+        ],
+        "summary": "OIDC callback",
+        "description": "Handle the OIDC provider callback, link or create a user, and redirect with a session token.",
+        "operationId": "oidc_callback_api_oidc_callback_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/oidc/exchange": {
+      "post": {
+        "tags": [
+          "oidc"
+        ],
+        "summary": "Exchange a one-time OIDC code for a JWT",
+        "description": "Trade the short-lived code from the callback redirect for the real JWT.",
+        "operationId": "oidc_exchange_api_oidc_exchange_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/_OidcExchangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guest/session": {
+      "post": {
+        "tags": [
+          "guest"
+        ],
+        "summary": "Create or resume a guest session",
+        "description": "Create a new guest user or resume an existing guest session via cookie.",
+        "operationId": "create_guest_session_api_guest_session_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stats": {
+      "get": {
+        "tags": [
+          "stats"
+        ],
+        "summary": "Get stats for all users",
+        "description": "Return upload, output-file, and storage stats for every user (admin only).",
+        "operationId": "get_stats_api_stats_get",
+        "responses": {
+          "200": {
+            "description": "Aggregated stats across all users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin privileges required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiKeyCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "description": "Human-readable label for the key",
+            "example": "CI pipeline"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ApiKeyCreateRequest"
+      },
+      "ApiKeyCreatedResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique key identifier"
+          },
+          "user_uuid": {
+            "type": "string",
+            "title": "User Uuid",
+            "description": "Owning user UUID"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Human-readable label"
+          },
+          "prefix": {
+            "type": "string",
+            "title": "Prefix",
+            "description": "First 8 characters of the key for identification"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "Creation timestamp"
+          },
+          "raw_key": {
+            "type": "string",
+            "title": "Raw Key",
+            "description": "Full API key (shown only once)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_uuid",
+          "name",
+          "prefix",
+          "raw_key"
+        ],
+        "title": "ApiKeyCreatedResponse"
+      },
+      "ApiKeyDeleteResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Deletion status message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ApiKeyDeleteResponse"
+      },
+      "ApiKeyListResponse": {
+        "properties": {
+          "api_keys": {
+            "items": {
+              "$ref": "#/components/schemas/ApiKeyResponse"
+            },
+            "type": "array",
+            "title": "Api Keys",
+            "description": "List of API keys for the user"
+          }
+        },
+        "type": "object",
+        "required": [
+          "api_keys"
+        ],
+        "title": "ApiKeyListResponse"
+      },
+      "ApiKeyResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique key identifier"
+          },
+          "user_uuid": {
+            "type": "string",
+            "title": "User Uuid",
+            "description": "Owning user UUID"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Human-readable label"
+          },
+          "prefix": {
+            "type": "string",
+            "title": "Prefix",
+            "description": "First 8 characters of the key for identification"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "Creation timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_uuid",
+          "name",
+          "prefix"
+        ],
+        "title": "ApiKeyResponse"
+      },
+      "AppInfo": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Application name",
+            "example": "Transmute"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "description": "Application version",
+            "example": "v1.0.0"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "version"
+        ],
+        "title": "AppInfo"
+      },
+      "AppSettingsResponse": {
+        "properties": {
+          "theme": {
+            "type": "string",
+            "title": "Theme",
+            "description": "Active UI theme key (built-in or custom)",
+            "example": "rubedo"
+          },
+          "auto_download": {
+            "type": "boolean",
+            "title": "Auto Download",
+            "description": "Auto-download converted files on completion",
+            "example": false
+          },
+          "keep_originals": {
+            "type": "boolean",
+            "title": "Keep Originals",
+            "description": "Retain uploaded source files after conversion",
+            "example": true
+          },
+          "cleanup_enabled": {
+            "type": "boolean",
+            "title": "Cleanup Enabled",
+            "description": "Enable automatic cleanup of old files",
+            "example": true
+          },
+          "cleanup_ttl_minutes": {
+            "type": "integer",
+            "title": "Cleanup Ttl Minutes",
+            "description": "Time-to-live in minutes for cleanup",
+            "example": 60
+          },
+          "datetime_display_format": {
+            "type": "string",
+            "title": "Datetime Display Format",
+            "description": "Datetime display format pattern or 'locale'",
+            "example": "DD/MM/YYYY - HH:mm:ss"
+          }
+        },
+        "type": "object",
+        "required": [
+          "theme",
+          "auto_download",
+          "keep_originals",
+          "cleanup_enabled",
+          "cleanup_ttl_minutes",
+          "datetime_display_format"
+        ],
+        "title": "AppSettingsResponse"
+      },
+      "AppSettingsUpdate": {
+        "properties": {
+          "theme": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theme",
+            "description": "Theme key to apply (built-in or custom)",
+            "example": "rubedo"
+          },
+          "auto_download": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Download",
+            "description": "Auto-download on completion",
+            "example": false
+          },
+          "keep_originals": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keep Originals",
+            "description": "Keep original files after conversion",
+            "example": true
+          },
+          "cleanup_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cleanup Enabled",
+            "description": "Enable automatic cleanup of old files",
+            "example": true
+          },
+          "cleanup_ttl_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cleanup Ttl Minutes",
+            "description": "Time-to-live in minutes for cleanup",
+            "example": 60
+          },
+          "datetime_display_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datetime Display Format",
+            "description": "Datetime display format pattern or 'locale'",
+            "example": "DD/MM/YYYY - HH:mm:ss"
+          }
+        },
+        "type": "object",
+        "title": "AppSettingsUpdate"
+      },
+      "BatchDownloadRequest": {
+        "properties": {
+          "file_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "File Ids",
+            "description": "List of converted file IDs to download",
+            "example": [
+              "123e4567-e89b-12d3-a456-426614174000",
+              "987fcdeb-51a2-43f1-b789-123456789abc"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "file_ids"
+        ],
+        "title": "BatchDownloadRequest"
+      },
+      "Body_issue_token_api_users_token_post": {
+        "properties": {
+          "grant_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^password$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grant Type"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "title": "Password"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope",
+            "default": ""
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "format": "password",
+            "title": "Client Secret"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "Body_issue_token_api_users_token_post"
+      },
+      "Body_upload_file_api_files_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_file_api_files_post"
+      },
+      "ChunkedUploadChunkResponse": {
+        "properties": {
+          "upload_id": {
+            "type": "string",
+            "title": "Upload Id",
+            "description": "Upload session UUID"
+          },
+          "chunk_index": {
+            "type": "integer",
+            "title": "Chunk Index",
+            "description": "Index of the chunk that was received"
+          }
+        },
+        "type": "object",
+        "required": [
+          "upload_id",
+          "chunk_index"
+        ],
+        "title": "ChunkedUploadChunkResponse"
+      },
+      "ChunkedUploadCompleteRequest": {
+        "properties": {
+          "upload_id": {
+            "type": "string",
+            "title": "Upload Id",
+            "description": "Upload session UUID to finalize",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          }
+        },
+        "type": "object",
+        "required": [
+          "upload_id"
+        ],
+        "title": "ChunkedUploadCompleteRequest"
+      },
+      "ChunkedUploadInitRequest": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "description": "Original filename including extension",
+            "example": "large_video.mp4"
+          },
+          "total_size": {
+            "type": "integer",
+            "title": "Total Size",
+            "description": "Total file size in bytes",
+            "example": 104857600
+          },
+          "total_chunks": {
+            "type": "integer",
+            "title": "Total Chunks",
+            "description": "Number of chunks the file is split into",
+            "example": 3
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "total_size",
+          "total_chunks"
+        ],
+        "title": "ChunkedUploadInitRequest"
+      },
+      "ChunkedUploadInitResponse": {
+        "properties": {
+          "upload_id": {
+            "type": "string",
+            "title": "Upload Id",
+            "description": "UUID identifying this chunked upload session",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          }
+        },
+        "type": "object",
+        "required": [
+          "upload_id"
+        ],
+        "title": "ChunkedUploadInitResponse"
+      },
+      "CompressionItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          },
+          "original_filename": {
+            "type": "string",
+            "title": "Original Filename",
+            "example": "example.jpg"
+          },
+          "media_type": {
+            "type": "string",
+            "title": "Media Type",
+            "example": "jpg"
+          },
+          "extension": {
+            "type": "string",
+            "title": "Extension",
+            "example": ".jpg"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes",
+            "example": 102400
+          },
+          "sha256_checksum": {
+            "type": "string",
+            "title": "Sha256 Checksum",
+            "example": "abc123def456..."
+          },
+          "compression_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compression Level",
+            "description": "Compression-level preset used for this compression",
+            "example": "balanced"
+          },
+          "original_file": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Original file metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "original_filename",
+          "media_type",
+          "extension",
+          "size_bytes",
+          "sha256_checksum"
+        ],
+        "title": "CompressionItem"
+      },
+      "CompressionJobCreateRequest": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "ID of the source file to compress",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          },
+          "compression_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compression Level",
+            "description": "Optional compression-level preset (e.g. light, balanced, max)",
+            "example": "balanced"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "CompressionJobCreateRequest"
+      },
+      "CompressionJobListResponse": {
+        "properties": {
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/CompressionJobResponse"
+            },
+            "type": "array",
+            "title": "Jobs",
+            "description": "List of compression jobs for the current user"
+          }
+        },
+        "type": "object",
+        "required": [
+          "jobs"
+        ],
+        "title": "CompressionJobListResponse"
+      },
+      "CompressionJobResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Job UUID"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "Owning user UUID"
+          },
+          "source_file_id": {
+            "type": "string",
+            "title": "Source File Id",
+            "description": "Source file ID being compressed"
+          },
+          "compression_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compression Level",
+            "description": "Compression-level preset used, if any"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "description": "Current job status"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress",
+            "description": "0-100 progress hint when available"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message",
+            "description": "Error message when status is failed"
+          },
+          "output_file_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output File Id",
+            "description": "ID of the resulting compressed file when completed"
+          },
+          "compressor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compressor Name",
+            "description": "Compressor implementation that handled (or will handle) the job"
+          },
+          "source_filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Filename",
+            "description": "Denormalized source filename at submit time"
+          },
+          "source_media_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Media Type",
+            "description": "Denormalized source media type at submit time"
+          },
+          "source_extension": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Extension",
+            "description": "Denormalized source extension at submit time"
+          },
+          "source_size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Size Bytes",
+            "description": "Denormalized source size at submit time"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "Creation timestamp"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At",
+            "description": "Time the worker began processing"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At",
+            "description": "Time the job reached a terminal status"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At",
+            "description": "Last update timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "source_file_id",
+          "status"
+        ],
+        "title": "CompressionJobResponse"
+      },
+      "CompressionListResponse": {
+        "properties": {
+          "compressions": {
+            "items": {
+              "$ref": "#/components/schemas/CompressionItem"
+            },
+            "type": "array",
+            "title": "Compressions",
+            "description": "List of completed compressions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "compressions"
+        ],
+        "title": "CompressionListResponse"
+      },
+      "CompressionRequest": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "ID of file to compress",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          },
+          "compression_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compression Level",
+            "description": "Optional compression-level preset (e.g. light, balanced, max)",
+            "example": "balanced"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "CompressionRequest"
+      },
+      "CompressorMetadata": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "example": "image_compress"
+          },
+          "supported_formats": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Supported Formats",
+            "description": "Media formats this compressor can compress (input == output)",
+            "example": [
+              "jpeg",
+              "png"
+            ]
+          },
+          "formats_with_compression_levels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Formats With Compression Levels",
+            "description": "Subset of supported formats that honor a compression-level preset",
+            "example": [
+              "jpeg"
+            ]
+          },
+          "compression_levels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Compression Levels",
+            "description": "Available compression-level presets",
+            "example": [
+              "light",
+              "balanced",
+              "max"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "supported_formats",
+          "formats_with_compression_levels",
+          "compression_levels"
+        ],
+        "title": "CompressorMetadata"
+      },
+      "CompressorMetadataListResponse": {
+        "properties": {
+          "compressors": {
+            "items": {
+              "$ref": "#/components/schemas/CompressorMetadata"
+            },
+            "type": "array",
+            "title": "Compressors",
+            "description": "List of the available compressors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "compressors"
+        ],
+        "title": "CompressorMetadataListResponse"
+      },
+      "ConversionItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          },
+          "original_filename": {
+            "type": "string",
+            "title": "Original Filename",
+            "example": "example.jpg"
+          },
+          "media_type": {
+            "type": "string",
+            "title": "Media Type",
+            "example": "png"
+          },
+          "extension": {
+            "type": "string",
+            "title": "Extension",
+            "example": ".png"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes",
+            "example": 204800
+          },
+          "sha256_checksum": {
+            "type": "string",
+            "title": "Sha256 Checksum",
+            "example": "abc123def456..."
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality",
+            "description": "Quality setting used for this conversion",
+            "example": "medium"
+          },
+          "original_file": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Original file metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "original_filename",
+          "media_type",
+          "extension",
+          "size_bytes",
+          "sha256_checksum"
+        ],
+        "title": "ConversionItem"
+      },
+      "ConversionJobCreateRequest": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "ID of the source file to convert",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          },
+          "output_format": {
+            "type": "string",
+            "title": "Output Format",
+            "description": "Target format for conversion",
+            "example": "png"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality",
+            "description": "Optional quality setting (e.g. low, medium, high)",
+            "example": "medium"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "output_format"
+        ],
+        "title": "ConversionJobCreateRequest"
+      },
+      "ConversionJobListResponse": {
+        "properties": {
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/ConversionJobResponse"
+            },
+            "type": "array",
+            "title": "Jobs",
+            "description": "List of conversion jobs for the current user"
+          }
+        },
+        "type": "object",
+        "required": [
+          "jobs"
+        ],
+        "title": "ConversionJobListResponse"
+      },
+      "ConversionJobResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Job UUID"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "Owning user UUID"
+          },
+          "source_file_id": {
+            "type": "string",
+            "title": "Source File Id",
+            "description": "Source file ID being converted"
+          },
+          "output_format": {
+            "type": "string",
+            "title": "Output Format",
+            "description": "Target output format"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality",
+            "description": "Quality option used, if any"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "description": "Current job status"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress",
+            "description": "0-100 progress hint when available"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message",
+            "description": "Error message when status is failed"
+          },
+          "output_file_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output File Id",
+            "description": "ID of the resulting converted file when completed"
+          },
+          "converter_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Converter Name",
+            "description": "Converter implementation that handled (or will handle) the job"
+          },
+          "source_filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Filename",
+            "description": "Denormalized source filename at submit time"
+          },
+          "source_media_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Media Type",
+            "description": "Denormalized source media type at submit time"
+          },
+          "source_extension": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Extension",
+            "description": "Denormalized source extension at submit time"
+          },
+          "source_size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Size Bytes",
+            "description": "Denormalized source size at submit time"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "Creation timestamp"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At",
+            "description": "Time the worker began processing"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At",
+            "description": "Time the job reached a terminal status"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At",
+            "description": "Last update timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "source_file_id",
+          "output_format",
+          "status"
+        ],
+        "title": "ConversionJobResponse"
+      },
+      "ConversionListResponse": {
+        "properties": {
+          "conversions": {
+            "items": {
+              "$ref": "#/components/schemas/ConversionItem"
+            },
+            "type": "array",
+            "title": "Conversions",
+            "description": "List of completed conversions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversions"
+        ],
+        "title": "ConversionListResponse"
+      },
+      "ConversionRequest": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "ID of file to convert",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality",
+            "description": "Optional quality setting for conversion (e.g. low, medium, high)",
+            "example": "medium"
+          },
+          "output_format": {
+            "type": "string",
+            "title": "Output Format",
+            "description": "Target format for conversion",
+            "example": "png"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "output_format"
+        ],
+        "title": "ConversionRequest"
+      },
+      "ConverterMetadata": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "example": "drawio_convert"
+          },
+          "supported_input_formats": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Supported Input Formats",
+            "example": [
+              "drawio"
+            ]
+          },
+          "supported_output_formats": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Supported Output Formats",
+            "example": [
+              "png",
+              "pdf",
+              "jpg"
+            ]
+          },
+          "formats_with_qualities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Formats With Qualities",
+            "description": "Output formats that support quality options",
+            "example": [
+              "jpeg"
+            ]
+          },
+          "qualities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Qualities",
+            "description": "Available quality levels",
+            "example": [
+              "low",
+              "medium",
+              "high"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "supported_input_formats",
+          "supported_output_formats",
+          "formats_with_qualities",
+          "qualities"
+        ],
+        "title": "ConverterMetadata"
+      },
+      "ConverterMetadataListResponse": {
+        "properties": {
+          "converters": {
+            "items": {
+              "$ref": "#/components/schemas/ConverterMetadata"
+            },
+            "type": "array",
+            "title": "Converters",
+            "description": "List of the available converters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "converters"
+        ],
+        "title": "ConverterMetadataListResponse"
+      },
+      "CustomThemeColors": {
+        "properties": {
+          "primary": {
+            "type": "string",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+            "title": "Primary",
+            "description": "Primary brand color",
+            "example": "#ef4444"
+          },
+          "primary_light": {
+            "type": "string",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+            "title": "Primary Light",
+            "description": "Lighter primary variant",
+            "example": "#f87171"
+          },
+          "primary_dark": {
+            "type": "string",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+            "title": "Primary Dark",
+            "description": "Darker primary variant",
+            "example": "#b91c1c"
+          },
+          "accent": {
+            "type": "string",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+            "title": "Accent",
+            "description": "Accent color",
+            "example": "#f59e0b"
+          },
+          "success": {
+            "type": "string",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+            "title": "Success",
+            "description": "Success color",
+            "example": "#22c55e"
+          },
+          "success_light": {
+            "type": "string",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+            "title": "Success Light",
+            "description": "Lighter success variant",
+            "example": "#4ade80"
+          },
+          "success_dark": {
+            "type": "string",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+            "title": "Success Dark",
+            "description": "Darker success variant",
+            "example": "#15803d"
+          },
+          "surface_dark": {
+            "type": "string",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+            "title": "Surface Dark",
+            "description": "Dark surface background",
+            "example": "#0f172a"
+          },
+          "surface_light": {
+            "type": "string",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+            "title": "Surface Light",
+            "description": "Light surface background",
+            "example": "#1e293b"
+          },
+          "text": {
+            "type": "string",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+            "title": "Text",
+            "description": "Primary text color",
+            "example": "#f8fafc"
+          },
+          "text_muted": {
+            "type": "string",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+            "title": "Text Muted",
+            "description": "Muted text color",
+            "example": "#cbd5e1"
+          }
+        },
+        "type": "object",
+        "required": [
+          "primary",
+          "primary_light",
+          "primary_dark",
+          "accent",
+          "success",
+          "success_light",
+          "success_dark",
+          "surface_dark",
+          "surface_light",
+          "text",
+          "text_muted"
+        ],
+        "title": "CustomThemeColors"
+      },
+      "CustomThemeCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Name",
+            "description": "Display name",
+            "example": "My Theme"
+          },
+          "colors": {
+            "$ref": "#/components/schemas/CustomThemeColors",
+            "description": "Color token payload (every token is required)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "colors"
+        ],
+        "title": "CustomThemeCreateRequest"
+      },
+      "CustomThemeListResponse": {
+        "properties": {
+          "themes": {
+            "items": {
+              "$ref": "#/components/schemas/CustomThemeResponse"
+            },
+            "type": "array",
+            "title": "Themes",
+            "description": "All custom themes registered in the database"
+          },
+          "builtins": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Builtins",
+            "description": "Built-in theme keys defined by the application"
+          }
+        },
+        "type": "object",
+        "required": [
+          "themes",
+          "builtins"
+        ],
+        "title": "CustomThemeListResponse"
+      },
+      "CustomThemeResponse": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Stable URL-safe identifier",
+            "example": "my-theme"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Human-readable display name",
+            "example": "My Theme"
+          },
+          "colors": {
+            "$ref": "#/components/schemas/CustomThemeColors",
+            "description": "Color token values (hex)"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By",
+            "description": "UUID of the user that created the theme"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "ISO-8601 creation timestamp"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At",
+            "description": "ISO-8601 last-update timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "colors"
+        ],
+        "title": "CustomThemeResponse"
+      },
+      "CustomThemeUpdateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "New display name",
+            "example": "My Theme"
+          },
+          "colors": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CustomThemeColors"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Replacement color token payload"
+          }
+        },
+        "type": "object",
+        "title": "CustomThemeUpdateRequest"
+      },
+      "DefaultCompressionLevelListResponse": {
+        "properties": {
+          "defaults": {
+            "items": {
+              "$ref": "#/components/schemas/DefaultCompressionLevelMapping"
+            },
+            "type": "array",
+            "title": "Defaults",
+            "description": "List of default compression-level mappings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "defaults"
+        ],
+        "title": "DefaultCompressionLevelListResponse"
+      },
+      "DefaultCompressionLevelMapping": {
+        "properties": {
+          "media_format": {
+            "type": "string",
+            "title": "Media Format",
+            "description": "Media file format",
+            "example": "jpeg"
+          },
+          "compression_level": {
+            "type": "string",
+            "title": "Compression Level",
+            "description": "Default compression-level preset",
+            "example": "max"
+          }
+        },
+        "type": "object",
+        "required": [
+          "media_format",
+          "compression_level"
+        ],
+        "title": "DefaultCompressionLevelMapping"
+      },
+      "DefaultFormatListResponse": {
+        "properties": {
+          "defaults": {
+            "items": {
+              "$ref": "#/components/schemas/DefaultFormatMapping"
+            },
+            "type": "array",
+            "title": "Defaults",
+            "description": "List of default format mappings"
+          },
+          "aliases": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Aliases",
+            "description": "Format alias map (e.g. jpg -> jpeg)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "defaults",
+          "aliases"
+        ],
+        "title": "DefaultFormatListResponse"
+      },
+      "DefaultFormatMapping": {
+        "properties": {
+          "input_format": {
+            "type": "string",
+            "title": "Input Format",
+            "description": "Input file format",
+            "example": "png"
+          },
+          "output_format": {
+            "type": "string",
+            "title": "Output Format",
+            "description": "Default output format",
+            "example": "jpeg"
+          }
+        },
+        "type": "object",
+        "required": [
+          "input_format",
+          "output_format"
+        ],
+        "title": "DefaultFormatMapping"
+      },
+      "DefaultQualityListResponse": {
+        "properties": {
+          "defaults": {
+            "items": {
+              "$ref": "#/components/schemas/DefaultQualityMapping"
+            },
+            "type": "array",
+            "title": "Defaults",
+            "description": "List of default quality mappings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "defaults"
+        ],
+        "title": "DefaultQualityListResponse"
+      },
+      "DefaultQualityMapping": {
+        "properties": {
+          "output_format": {
+            "type": "string",
+            "title": "Output Format",
+            "description": "Output file format",
+            "example": "jpeg"
+          },
+          "quality": {
+            "type": "string",
+            "title": "Quality",
+            "description": "Default quality level",
+            "example": "high"
+          }
+        },
+        "type": "object",
+        "required": [
+          "output_format",
+          "quality"
+        ],
+        "title": "DefaultQualityMapping"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "description": "Error message",
+            "example": "No converter found for jpg to png"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ErrorResponse"
+      },
+      "FileDeleteResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Deletion status message",
+            "example": "File deleted successfully"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "FileDeleteResponse"
+      },
+      "FileListResponse": {
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/FileMetadata"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "List of uploaded files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "title": "FileListResponse"
+      },
+      "FileMetadata": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          },
+          "storage_path": {
+            "type": "string",
+            "title": "Storage Path",
+            "example": "data/uploads/6e36aefe-b129-436e-999d-f5037075c017.png"
+          },
+          "original_filename": {
+            "type": "string",
+            "title": "Original Filename",
+            "example": "example.jpg"
+          },
+          "media_type": {
+            "type": "string",
+            "title": "Media Type",
+            "example": "jpg"
+          },
+          "extension": {
+            "type": "string",
+            "title": "Extension",
+            "example": ".jpg"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes",
+            "example": 204800
+          },
+          "sha256_checksum": {
+            "type": "string",
+            "title": "Sha256 Checksum",
+            "example": "abc123def456..."
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "example": "67118d71-a0c5-443c-80b5-e222bb63bfc2"
+          },
+          "compatible_formats": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Compatible Formats",
+            "description": "Map of compatible output formats to their available quality options",
+            "example": {
+              "gif": [],
+              "png": [],
+              "webp": [
+                "low",
+                "medium",
+                "high"
+              ]
+            }
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "storage_path",
+          "original_filename",
+          "media_type",
+          "extension",
+          "size_bytes",
+          "sha256_checksum",
+          "user_id",
+          "compatible_formats"
+        ],
+        "title": "FileMetadata"
+      },
+      "FileMetadataWithFormats": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          },
+          "storage_path": {
+            "type": "string",
+            "title": "Storage Path",
+            "example": "data/uploads/6e36aefe-b129-436e-999d-f5037075c017.png"
+          },
+          "original_filename": {
+            "type": "string",
+            "title": "Original Filename",
+            "example": "example.jpg"
+          },
+          "media_type": {
+            "type": "string",
+            "title": "Media Type",
+            "example": "jpg"
+          },
+          "extension": {
+            "type": "string",
+            "title": "Extension",
+            "example": ".jpg"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes",
+            "example": 204800
+          },
+          "sha256_checksum": {
+            "type": "string",
+            "title": "Sha256 Checksum",
+            "example": "abc123def456..."
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "example": "67118d71-a0c5-443c-80b5-e222bb63bfc2"
+          },
+          "compatible_formats": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Compatible Formats",
+            "description": "Map of compatible output formats to their available quality options",
+            "example": {
+              "gif": [],
+              "png": [],
+              "webp": [
+                "low",
+                "medium",
+                "high"
+              ]
+            }
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "storage_path",
+          "original_filename",
+          "media_type",
+          "extension",
+          "size_bytes",
+          "sha256_checksum",
+          "user_id",
+          "compatible_formats"
+        ],
+        "title": "FileMetadataWithFormats"
+      },
+      "FileUploadResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Upload status message",
+            "example": "File uploaded successfully"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/FileMetadataWithFormats",
+            "description": "Uploaded file metadata with compatible formats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "metadata"
+        ],
+        "title": "FileUploadResponse"
+      },
+      "FileUrlUploadResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Upload status message",
+            "example": "File uploaded successfully"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/FileMetadataWithFormats"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "Metadata for every file retrieved from the URL. A single URL may resolve to multiple files (e.g. a playlist)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "files"
+        ],
+        "title": "FileUrlUploadResponse"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthStatus": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Health status",
+            "example": "alive"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "HealthStatus"
+      },
+      "ReadinessChecks": {
+        "properties": {
+          "database": {
+            "type": "string",
+            "title": "Database",
+            "description": "Database check status",
+            "example": "ok"
+          },
+          "storage": {
+            "type": "string",
+            "title": "Storage",
+            "description": "Storage check status",
+            "example": "ok"
+          }
+        },
+        "type": "object",
+        "required": [
+          "database",
+          "storage"
+        ],
+        "title": "ReadinessChecks"
+      },
+      "ReadinessResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Overall readiness status",
+            "example": "ready"
+          },
+          "checks": {
+            "$ref": "#/components/schemas/ReadinessChecks",
+            "description": "Individual component checks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "checks"
+        ],
+        "title": "ReadinessResponse"
+      },
+      "StatsResponse": {
+        "properties": {
+          "total_files_uploaded": {
+            "type": "integer",
+            "title": "Total Files Uploaded",
+            "description": "Total files uploaded across all users",
+            "example": 42
+          },
+          "total_output_files": {
+            "type": "integer",
+            "title": "Total Output Files",
+            "description": "Total output files produced across all users (conversions + compressions)",
+            "example": 30
+          },
+          "total_storage_bytes": {
+            "type": "integer",
+            "title": "Total Storage Bytes",
+            "description": "Total storage used in bytes across all users",
+            "example": 104857600
+          },
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/UserStatsItem"
+            },
+            "type": "array",
+            "title": "Users",
+            "description": "Per-user breakdown of stats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_files_uploaded",
+          "total_output_files",
+          "total_storage_bytes",
+          "users"
+        ],
+        "title": "StatsResponse"
+      },
+      "UploadConfigResponse": {
+        "properties": {
+          "max_chunk_size": {
+            "type": "integer",
+            "title": "Max Chunk Size",
+            "description": "Maximum bytes per request; files larger than this should be uploaded in chunks. 0 = unlimited"
+          }
+        },
+        "type": "object",
+        "required": [
+          "max_chunk_size"
+        ],
+        "title": "UploadConfigResponse"
+      },
+      "UrlUploadRequest": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "Direct URL to a file for Transmute to download",
+            "example": "https://example.com/file.pdf"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "UrlUploadRequest"
+      },
+      "UserAuthRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Username",
+            "description": "Username to authenticate",
+            "example": "alice"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Password",
+            "description": "Plain-text password to verify",
+            "example": "correct horse battery staple"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "UserAuthRequest"
+      },
+      "UserAuthResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token",
+            "description": "Signed JWT access token",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "description": "OAuth2 token type",
+            "example": "bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In",
+            "description": "Token lifetime in seconds",
+            "example": 3600
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserResponse",
+            "description": "Authenticated user details"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in",
+          "user"
+        ],
+        "title": "UserAuthResponse"
+      },
+      "UserBootstrapStatusResponse": {
+        "properties": {
+          "requires_setup": {
+            "type": "boolean",
+            "title": "Requires Setup",
+            "description": "Whether the first admin account still needs to be created",
+            "example": true
+          },
+          "user_count": {
+            "type": "integer",
+            "title": "User Count",
+            "description": "Current number of users",
+            "example": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "requires_setup",
+          "user_count"
+        ],
+        "title": "UserBootstrapStatusResponse"
+      },
+      "UserCreateRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Username",
+            "description": "Unique account username",
+            "example": "alice"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email",
+            "description": "Optional email address",
+            "example": "alice@example.com"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name",
+            "description": "Optional full name",
+            "example": "Alice Example"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "title": "Password",
+            "description": "Plain-text password (min 8 characters)",
+            "example": "correct horse battery staple"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "member",
+              "guest"
+            ],
+            "title": "Role",
+            "description": "Assigned role",
+            "default": "member",
+            "example": "member"
+          },
+          "disabled": {
+            "type": "boolean",
+            "title": "Disabled",
+            "description": "Whether the account starts disabled",
+            "default": false,
+            "example": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "UserCreateRequest"
+      },
+      "UserDeleteResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Deletion status message",
+            "example": "User deleted successfully"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "UserDeleteResponse"
+      },
+      "UserListResponse": {
+        "properties": {
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/UserResponse"
+            },
+            "type": "array",
+            "title": "Users",
+            "description": "List of users"
+          }
+        },
+        "type": "object",
+        "required": [
+          "users"
+        ],
+        "title": "UserListResponse"
+      },
+      "UserResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "title": "Uuid",
+            "description": "Stable user UUID",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "description": "Unique account username",
+            "example": "alice"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email",
+            "description": "Optional email address",
+            "example": "alice@example.com"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name",
+            "description": "Optional full name",
+            "example": "Alice Example"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "member",
+              "guest"
+            ],
+            "title": "Role",
+            "description": "Assigned role",
+            "example": "member"
+          },
+          "disabled": {
+            "type": "boolean",
+            "title": "Disabled",
+            "description": "Whether the account is disabled",
+            "example": false
+          },
+          "is_guest": {
+            "type": "boolean",
+            "title": "Is Guest",
+            "description": "Whether this is a guest account",
+            "default": false,
+            "example": false
+          },
+          "has_usable_password": {
+            "type": "boolean",
+            "title": "Has Usable Password",
+            "description": "Whether the account has a local password (false for OIDC-only accounts)",
+            "default": true,
+            "example": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "username",
+          "role",
+          "disabled"
+        ],
+        "title": "UserResponse"
+      },
+      "UserSelfUpdateRequest": {
+        "properties": {
+          "username": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username",
+            "description": "Unique account username",
+            "example": "alice"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email",
+            "description": "Optional email address",
+            "example": "alice@example.com"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name",
+            "description": "Optional full name",
+            "example": "Alice Example"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 8
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password",
+            "description": "New plain-text password (min 8 characters)",
+            "example": "new secure password"
+          },
+          "current_password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Password",
+            "description": "Existing password, required when setting a new one",
+            "example": "current password"
+          }
+        },
+        "type": "object",
+        "title": "UserSelfUpdateRequest"
+      },
+      "UserStatsItem": {
+        "properties": {
+          "user_uuid": {
+            "type": "string",
+            "title": "User Uuid",
+            "description": "User UUID",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "description": "Username",
+            "example": "alice"
+          },
+          "files_uploaded": {
+            "type": "integer",
+            "title": "Files Uploaded",
+            "description": "Number of files uploaded",
+            "example": 12
+          },
+          "output_files": {
+            "type": "integer",
+            "title": "Output Files",
+            "description": "Number of output files produced (conversions + compressions)",
+            "example": 8
+          },
+          "storage_bytes": {
+            "type": "integer",
+            "title": "Storage Bytes",
+            "description": "Total storage used in bytes (uploads + conversions + compressions)",
+            "example": 10485760
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_uuid",
+          "username",
+          "files_uploaded",
+          "output_files",
+          "storage_bytes"
+        ],
+        "title": "UserStatsItem"
+      },
+      "UserUpdateRequest": {
+        "properties": {
+          "username": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username",
+            "description": "Unique account username",
+            "example": "alice"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email",
+            "description": "Optional email address",
+            "example": "alice@example.com"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name",
+            "description": "Optional full name",
+            "example": "Alice Example"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 8
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password",
+            "description": "New plain-text password (min 8 characters)",
+            "example": "new secure password"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "admin",
+                  "member",
+                  "guest"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role",
+            "description": "Assigned role",
+            "example": "admin"
+          },
+          "disabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled",
+            "description": "Whether the account is disabled",
+            "example": false
+          }
+        },
+        "type": "object",
+        "title": "UserUpdateRequest"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "_OidcExchangeRequest": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "_OidcExchangeRequest"
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Send either a JWT or an API key as `Authorization: Bearer <token>`. Authenticate with your user account first, then create a key under 'My Account' -> 'API Keys'. The generated key is shown exactly once, so store it safely after creation."
+      }
+    }
+  },
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ]
+}

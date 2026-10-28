@@ -29,7 +29,9 @@ from db import (
     SettingsDB,
 )
 from registry import compressor_registry
-from services import CompressionFailedError, run_compression_job
+from services import CompressionFailedError, options_from_json, run_compression_job
+
+from .encode_tracking import ProgressReporter, running_job_cancels
 
 
 logger = logging.getLogger(__name__)
@@ -86,6 +88,19 @@ def _process_compression_job(
         return
 
     try:
+        options = options_from_json(job.get("options_json"))
+    except ValueError as exc:
+        job_db.mark_failed(job_id, f"Stored options are invalid: {exc}")
+        return
+
+    # Only the advanced options path reports progress and can be stopped
+    # mid-encode; legacy preset jobs run exactly as before.
+    progress_cb = cancel_event = None
+    if options is not None and getattr(compressor_type, "supports_options", False):
+        cancel_event = running_job_cancels.register(job_id)
+        progress_cb = ProgressReporter(job_db, job_id)
+
+    try:
         compressed_metadata = run_compression_job(
             source_metadata=source_metadata,
             compression_level=job.get("compression_level"),
@@ -96,8 +111,16 @@ def _process_compression_job(
             compression_relations_db=compression_relations_db,
             settings_db=settings_db,
             default_compression_levels_db=default_compression_levels_db,
+            options=options,
+            preset=job.get("preset"),
+            progress_cb=progress_cb,
+            cancel_event=cancel_event,
         )
     except CompressionFailedError as exc:
+        if cancel_event is not None and cancel_event.is_set():
+            job_db.mark_cancelled(job_id)
+            logger.info("Job %s cancelled while running", job_id)
+            return
         logger.warning("Job %s failed: %s", job_id, exc)
         job_db.mark_failed(job_id, str(exc))
         return
@@ -105,7 +128,12 @@ def _process_compression_job(
         logger.exception("Unexpected error processing job %s", job_id)
         job_db.mark_failed(job_id, f"Internal error: {exc}")
         return
+    finally:
+        if cancel_event is not None:
+            running_job_cancels.unregister(job_id)
 
+    if compressed_metadata.get("encoder_used"):
+        job_db.set_encoder_used(job_id, compressed_metadata["encoder_used"])
     job_db.mark_completed(job_id, output_file_id=compressed_metadata["id"])
     logger.info(
         "Job %s completed: %s compressed (output %s)",

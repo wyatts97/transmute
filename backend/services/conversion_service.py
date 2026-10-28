@@ -15,6 +15,7 @@ from __future__ import annotations
 import errno
 from pathlib import Path
 import shutil
+import threading
 import uuid
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -33,6 +34,10 @@ from db import (
     FileDB,
     SettingsDB,
 )
+from encoding import EncodeOptions
+from encoding.ffmpeg_runner import ProgressCallback
+
+from .encode_options import options_to_dict
 
 
 # Synthetic input formats produced by URL downloaders that pass straight
@@ -82,6 +87,10 @@ def run_conversion_job(
     conversion_relations_db: ConversionRelationsDB,
     settings_db: SettingsDB,
     default_qualities_db: DefaultQualitiesDB | None = None,
+    options: EncodeOptions | None = None,
+    preset: str | None = None,
+    progress_cb: ProgressCallback | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> dict:
     """Execute a conversion and persist the resulting metadata.
 
@@ -100,6 +109,11 @@ def run_conversion_job(
             Shared DB handles supplied by the caller.
         default_qualities_db: Optional handle used to resolve a default
             quality when ``quality`` is ``None``.
+        options: Resolved advanced options (see ``encode_options``). ``None``
+            keeps the legacy behavior.
+        preset: Preset key or id the options came from, recorded with the output.
+        progress_cb: Receives encode progress (advanced options path only).
+        cancel_event: Set to stop a running encode (advanced options path only).
 
     Returns:
         The converted file metadata dict (including ``id``,
@@ -132,14 +146,23 @@ def run_conversion_job(
         output_format,
     )
 
+    convert_kwargs: dict = {"quality": quality}
+    if options is not None:
+        if not getattr(converter_type, "supports_options", False):
+            raise ConversionFailedError(
+                f"Advanced options aren't supported for {input_format} to {output_format} conversions"
+            )
+        convert_kwargs.update(options=options, progress_cb=progress_cb, cancel_event=cancel_event)
+
     try:
         passthrough_base = WEB_ALIAS_PASSTHROUGH.get(input_format)
-        if passthrough_base is not None and output_format == passthrough_base:
+        # Advanced options always re-encode, so they skip the pass-through copy.
+        if passthrough_base is not None and output_format == passthrough_base and options is None:
             output_files = _copy_web_alias_to_base(
                 source_metadata["storage_path"], Path(temp_dir), converted_id, output_format
             )
         else:
-            output_files = converter.convert(quality=quality)
+            output_files = converter.convert(**convert_kwargs)
     except Exception as exc:
         raise ConversionFailedError(str(exc)) from exc
 
@@ -210,11 +233,20 @@ def run_conversion_job(
     converted_metadata.pop("created_at", None)
     if quality:
         converted_metadata["quality"] = quality
+    encode_metadata = {}
+    if options is not None:
+        encode_metadata = {
+            "options": options_to_dict(options),
+            "preset": preset,
+            "encoder_used": getattr(converter, "encoder_used", None),
+        }
+    converted_metadata.update(encode_metadata)
 
     conversion_db.insert_file_metadata(converted_metadata)
     if quality:
         # ``insert_file_metadata`` pops quality off; re-attach for the return value.
         converted_metadata["quality"] = quality
+    converted_metadata.update(encode_metadata)
 
     conversion_relations_db.insert_conversion_relation({
         "original_file_id": source_metadata["id"],

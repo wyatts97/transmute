@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 from core import get_settings, validate_safe_path
-from encoding import EncodeOptions, get_capabilities, merge_options, plan_av_encode
+from encoding import EncodeOptions, EncodeOptionsError, EncodePlan, get_capabilities, merge_options, plan_av_encode
 from encoding.ffmpeg_runner import ProgressCallback, run_encode_plan
 from encoding.probe import probe_media
 # Compression-level → encoder setting maps. They live in ``encoding.legacy``
@@ -38,7 +38,7 @@ from encoding.legacy import (
     QSCALE_BY_LEVEL as _QSCALE_BY_LEVEL,
     VP9_CRF_BY_LEVEL as _VP9_CRF_BY_LEVEL,
 )
-from .compressor_interface import CompressorInterface
+from .compressor_interface import CompressorInterface, _normalize_compressor_media_type
 
 
 logger = logging.getLogger(__name__)
@@ -464,6 +464,27 @@ class FFmpegCompressor(CompressorInterface):
             if os.path.exists(tmp_output):
                 os.remove(tmp_output)
 
+    @classmethod
+    def plan_options(
+        cls,
+        media_type: str,
+        compression_level: Optional[str],
+        options: EncodeOptions,
+        caps=None,
+    ) -> tuple[EncodeOptions, EncodePlan]:
+        """Merge ``options`` over the level preset and validate the result."""
+        media_type = _normalize_compressor_media_type(media_type)
+        base = legacy_compression_base(media_type, compression_level)
+        if base is None:
+            raise EncodeOptionsError(f"Advanced options aren't supported for {media_type} compression yet")
+        merged = merge_options(base, options)
+        return merged, plan_av_encode(media_type, merged, caps or get_capabilities())
+
+    @classmethod
+    def validate_options(cls, media_type: str, compression_level: Optional[str], options: EncodeOptions) -> None:
+        """Raise ``EncodeOptionsError`` if ``options`` can't be applied (no file access)."""
+        cls.plan_options(media_type, compression_level, options)
+
     def _compress_with_options(
         self,
         *,
@@ -477,12 +498,8 @@ class FFmpegCompressor(CompressorInterface):
     ) -> list[str]:
         """Re-encode with advanced options layered over the level preset."""
         try:
-            base = legacy_compression_base(self.media_type, compression_level)
-            if base is None:
-                raise ValueError(f"Advanced options aren't supported for {self.media_type} compression yet")
-            merged = merge_options(base, options)
             caps = get_capabilities()
-            plan = plan_av_encode(self.media_type, merged, caps)
+            merged, plan = self.plan_options(self.media_type, compression_level, options, caps)
             self.encoder_used = run_encode_plan(
                 plan,
                 input_file=self.input_file,

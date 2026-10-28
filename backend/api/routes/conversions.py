@@ -4,9 +4,11 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from registry import registry
 from core import get_settings, sanitize_extension, delete_file_and_metadata
-from db import ConversionDB, ConversionJobDB, FileDB, ConversionRelationsDB, SettingsDB, DefaultQualitiesDB
-from services import ConversionFailedError, run_conversion_job
-from api.deps import get_current_active_user, get_file_db, get_conversion_db, get_conversion_job_db, get_conversion_relations_db, get_settings_db, get_default_qualities_db
+from db import ConversionDB, ConversionJobDB, FileDB, ConversionRelationsDB, SettingsDB, DefaultQualitiesDB, PresetDB
+from encoding import EncodeOptionsError
+from services import ConversionFailedError, resolve_request_options, run_conversion_job, validate_conversion_options
+from api.deps import get_current_active_user, get_file_db, get_conversion_db, get_conversion_job_db, get_conversion_relations_db, get_settings_db, get_default_qualities_db, get_preset_db
+from api.errors import options_validation_error
 from api.schemas import ConversionRequest, ConversionListResponse, FileMetadata, ErrorResponse, FileDeleteResponse
 
 
@@ -97,6 +99,7 @@ def create_conversion(
     conversion_relations_db: ConversionRelationsDB = Depends(get_conversion_relations_db),
     settings_db: SettingsDB = Depends(get_settings_db),
     default_qualities_db: DefaultQualitiesDB = Depends(get_default_qualities_db),
+    preset_db: PresetDB = Depends(get_preset_db),
     current_user: dict = Depends(get_current_active_user),
 ):
     """Create a new conversion for a previously uploaded file."""
@@ -119,6 +122,18 @@ def create_conversion(
         raise HTTPException(status_code=400, detail=f"No converter found for {input_format} to {output_format}")
 
     try:
+        options = resolve_request_options(
+            preset=conversion_request.preset,
+            options=conversion_request.options,
+            user_id=current_user["uuid"],
+            preset_db=preset_db,
+        )
+        if options is not None:
+            validate_conversion_options(converter_type, input_format, output_format, conversion_request.quality, options)
+    except EncodeOptionsError as exc:
+        raise options_validation_error(exc)
+
+    try:
         converted_metadata = run_conversion_job(
             source_metadata=og_metadata,
             output_format=output_format,
@@ -130,6 +145,8 @@ def create_conversion(
             conversion_relations_db=conversion_relations_db,
             settings_db=settings_db,
             default_qualities_db=default_qualities_db,
+            options=options,
+            preset=conversion_request.preset if options is not None else None,
         )
     except ConversionFailedError as exc:
         raise HTTPException(status_code=400, detail=f"Conversion failed: {exc}")

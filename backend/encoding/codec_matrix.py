@@ -52,3 +52,20 @@ def container_spec(fmt: str) -> ContainerSpec | None:
 
 def is_audio_container(fmt: str) -> bool:
     return fmt in AUDIO_CONTAINERS
+
+
+def describe_containers() -> list[dict]:
+    """JSON-friendly container table for the capabilities endpoint."""
+    rows = []
+    for kind, table in (("video", VIDEO_CONTAINERS), ("audio", AUDIO_CONTAINERS)):
+        for fmt, spec in table.items():
+            rows.append({
+                "format": fmt,
+                "kind": kind,
+                "video_codecs": sorted(spec.video_codecs),
+                "audio_codecs": sorted(spec.audio_codecs),
+                "default_video": spec.default_video,
+                "default_audio": spec.default_audio,
+                "subtitle_copy": spec.subtitle_copy,
+            })
+    return rows

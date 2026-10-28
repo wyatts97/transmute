@@ -1,8 +1,9 @@
 from core import get_settings, migrate_table_columns
+from .encode_metadata import EncodeMetadataMixin
 from .file_db import FileDB
 
 
-class ConversionDB(FileDB):
+class ConversionDB(EncodeMetadataMixin, FileDB):
     """Database class for managing converted file metadata.
 
     Extends FileDB to store metadata for files that are the result of
@@ -23,6 +24,7 @@ class ConversionDB(FileDB):
         """Initialize ConversionDB and create the conversions table."""
         super().__init__()
         self._ensure_quality_column()
+        self._ensure_encode_columns()
 
     def _ensure_quality_column(self) -> None:
         """Ensure the conversion metadata table has the optional quality column."""
@@ -34,11 +36,14 @@ class ConversionDB(FileDB):
         """Create the conversion metadata table with the quality column."""
         super().create_tables()
         self._ensure_quality_column()
+        self._ensure_encode_columns()
 
     def insert_file_metadata(self, metadata: dict) -> None:
         """Insert a new conversion file metadata record, including optional quality."""
         quality = metadata.pop('quality', None)
+        options, preset, encoder_used = self._pop_encode_metadata(metadata)
         super().insert_file_metadata(metadata)
+        self._store_encode_metadata(metadata['id'], options, preset, encoder_used)
         if quality is not None:
             with self.conn:
                 self.conn.execute(

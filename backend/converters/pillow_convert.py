@@ -10,7 +10,7 @@ import pillow_jxl   # noqa: F401 — registers JPEG XL plugin on import
 from encoding import EncodeOptions, merge_options
 from encoding.image import apply_image_options, validate_image_options
 from encoding.legacy import legacy_image_conversion_base
-from .converter_interface import ConverterInterface
+from .converter_interface import ConverterInterface, _normalize_converter_media_type
 
 try:
     if sys.platform == 'darwin':
@@ -125,7 +125,14 @@ class PillowConverter(ConverterInterface):
         """
         super().__init__(input_file, output_dir, input_type, output_type)
         HeifImagePlugin.register_heif_opener()
-    
+
+    @classmethod
+    def validate_options(cls, input_type: str, output_type: str, quality: Optional[str], options: EncodeOptions) -> None:
+        """Raise ``EncodeOptionsError`` if ``options`` can't be applied (no file access)."""
+        output_type = _normalize_converter_media_type(output_type)
+        merged = merge_options(legacy_image_conversion_base(output_type, quality), options)
+        validate_image_options(output_type, merged)
+
     def can_convert(self) -> bool:
         """
         Check if the input file can be converted to the output format.
