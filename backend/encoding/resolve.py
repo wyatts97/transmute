@@ -121,7 +121,10 @@ def _plan_video(fmt: str, options: EncodeOptions, caps: Capabilities) -> VideoPl
             f"{fmt} can't hold {codec} video. Supported codecs for {fmt}: {', '.join(sorted(container.video_codecs))}"
         )
 
-    encoder = encoder or caps.default_encoder_for(codec)
+    bit_depth = (video.bit_depth if video and video.bit_depth else None) or 8
+    # Picks the GPU only when it passed a test encode at this bit depth, so a
+    # 10-bit request on a GPU without Main10 goes straight to the CPU encoder.
+    encoder = encoder or caps.default_encoder_for(codec, bit_depth)
     if encoder is None:
         raise EncodeOptionsError(f"No {codec} encoder is available on this server")
     if not caps.is_usable(encoder):
@@ -169,11 +172,14 @@ def _plan_video(fmt: str, options: EncodeOptions, caps: Capabilities) -> VideoPl
         supported = ", ".join(spec.tunes) if spec.tunes else "none"
         raise EncodeOptionsError(f"tune '{tune}' isn't valid for {encoder}. Supported: {supported}")
 
-    bit_depth = (video.bit_depth if video and video.bit_depth else None) or 8
-    if bit_depth not in spec.bit_depths:
-        alternatives = sorted(n for n, s in VIDEO_ENCODERS.items() if bit_depth in s.bit_depths and caps.is_usable(n))
+    if bit_depth not in spec.bit_depths or not caps.is_usable(encoder, bit_depth):
+        alternatives = sorted(
+            n for n, s in VIDEO_ENCODERS.items()
+            if s.codec == codec and bit_depth in s.bit_depths and caps.is_usable(n, bit_depth)
+        )
+        where = " on this GPU" if spec.hardware and bit_depth in spec.bit_depths else ""
         raise EncodeOptionsError(
-            f"{encoder} can't encode {bit_depth}-bit video."
+            f"{encoder} can't encode {bit_depth}-bit video{where}."
             + (f" Encoders that can: {', '.join(alternatives)}" if alternatives else "")
         )
 

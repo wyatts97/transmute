@@ -1,6 +1,13 @@
+# Build and start:            docker compose up -d --build
+# With GPU (VAAPI) encoding:  docker compose -f docker-compose.yml -f docker-compose.vaapi.yml up -d --build
 services:
   transmute:
-    image: ghcr.io/transmute-app/transmute:latest
+    # This fork builds its own image: upstream's published image doesn't
+    # include the advanced encoding options.
+    image: transmute-fork:latest
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
     container_name: transmute
     restart: unless-stopped
     ports:

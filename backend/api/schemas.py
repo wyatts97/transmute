@@ -484,7 +484,9 @@ class VideoEncoderInfo(BaseModel):
 
 class HardwareInfo(BaseModel):
     vaapi_device: Optional[str] = Field(None, description="Render node used for VAAPI, when a hardware encoder passed its test encode")
-    encoders: list[str] = Field(..., description="Hardware encoders verified usable on this host")
+    driver: Optional[str] = Field(None, description="VA-API driver reported by vainfo, e.g. the Mesa radeonsi driver", json_schema_extra={"example": "Mesa Gallium driver 25.0.7 for AMD Radeon Graphics (radeonsi, renoir, ...)"})
+    encoders: list[str] = Field(..., description="Hardware encoders verified usable on this host (8-bit)")
+    ten_bit_encoders: list[str] = Field(default_factory=list, description="Hardware encoders that also passed a 10-bit test encode")
 
 
 class ContainerInfo(BaseModel):

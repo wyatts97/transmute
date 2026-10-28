@@ -17,6 +17,19 @@ def cezanne_caps() -> Capabilities:
         compiled_encoders=frozenset(_SOFTWARE | {"h264_vaapi", "hevc_vaapi", "av1_vaapi"}),
         vaapi_device="/dev/dri/renderD128",
         usable_hw_encoders=frozenset({"h264_vaapi", "hevc_vaapi"}),
+        usable_hw_10bit_encoders=frozenset({"hevc_vaapi"}),
+        vaapi_driver="Mesa Gallium driver 25.0.7 for AMD Radeon Graphics (radeonsi, renoir)",
+    )
+
+
+@pytest.fixture
+def gpu_8bit_only_caps() -> Capabilities:
+    """A VAAPI GPU that encodes 8-bit HEVC but fails the Main10 test encode."""
+    return Capabilities(
+        ffmpeg_version="7.1.1",
+        compiled_encoders=frozenset(_SOFTWARE | {"h264_vaapi", "hevc_vaapi"}),
+        vaapi_device="/dev/dri/renderD128",
+        usable_hw_encoders=frozenset({"h264_vaapi", "hevc_vaapi"}),
     )
 
 

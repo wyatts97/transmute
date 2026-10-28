@@ -1,0 +1,25 @@
+# GPU (VAAPI) hardware encoding for AMD and Intel graphics.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.vaapi.yml up -d --build
+#   docker compose exec transmute vaapi-check
+#
+# Kept as an override because a `devices:` entry makes the container fail to
+# start on hosts without /dev/dri. See docs/vaapi.md for setup and checks.
+services:
+  transmute:
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      # "vaapi" logs a warning at startup if no GPU encoder works.
+      HW_ACCEL: vaapi
+      # Pick another render node on multi-GPU hosts (ls /dev/dri).
+      # VAAPI_DEVICE: /dev/dri/renderD129
+      # Force a VA driver if auto-detection picks the wrong one
+      # (radeonsi for AMD, iHD for Intel).
+      # LIBVA_DRIVER_NAME: radeonsi
+    # The container runs as root, which can open the render node without
+    # extra groups. If you run it as another user (user: "1000:1000") or
+    # under rootless Docker, add the host's render group ID:
+    #   getent group render | cut -d: -f3
+    # group_add:
+    #   - "105"

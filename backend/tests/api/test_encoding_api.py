@@ -50,6 +50,8 @@ CEZANNE = Capabilities(
     }),
     vaapi_device="/dev/dri/renderD128",
     usable_hw_encoders=frozenset({"h264_vaapi", "hevc_vaapi"}),
+    usable_hw_10bit_encoders=frozenset({"hevc_vaapi"}),
+    vaapi_driver="Mesa Gallium driver 25.0.7 for AMD Radeon Graphics (radeonsi, renoir)",
 )
 
 VIDEO = {"mp4", "mkv", "webm", "mov", "wmv"}
@@ -305,7 +307,12 @@ def test_preset_kind_must_match_options(env):
 
 def test_capabilities(env):
     caps = env.client.get("/api/capabilities").json()
-    assert caps["hardware"] == {"vaapi_device": "/dev/dri/renderD128", "encoders": ["h264_vaapi", "hevc_vaapi"]}
+    assert caps["hardware"] == {
+        "vaapi_device": "/dev/dri/renderD128",
+        "driver": "Mesa Gallium driver 25.0.7 for AMD Radeon Graphics (radeonsi, renoir)",
+        "encoders": ["h264_vaapi", "hevc_vaapi"],
+        "ten_bit_encoders": ["hevc_vaapi"],
+    }
     encoders = {e["name"]: e for e in caps["video_encoders"]}
     assert "av1_vaapi" not in encoders
     assert encoders["hevc_vaapi"]["quality_param"] == "qp"

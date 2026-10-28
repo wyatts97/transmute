@@ -55,16 +55,24 @@ class Capabilities:
     compiled_encoders: frozenset[str]
     vaapi_device: str | None
     usable_hw_encoders: frozenset[str]
+    # Hardware encoders that also passed a 10-bit (P010) test encode. GPUs
+    # often encode 8-bit HEVC but not Main10, so this is checked separately.
+    usable_hw_10bit_encoders: frozenset[str] = frozenset()
+    vaapi_driver: str | None = None
 
-    def is_usable(self, encoder: str) -> bool:
+    def is_usable(self, encoder: str, bit_depth: int = 8) -> bool:
         spec = VIDEO_ENCODERS.get(encoder)
         if spec is not None and spec.hardware:
+            if bit_depth == 10:
+                return encoder in self.usable_hw_10bit_encoders
             return encoder in self.usable_hw_encoders
         return encoder in self.compiled_encoders
 
-    def default_encoder_for(self, codec: str) -> str | None:
+    def default_encoder_for(self, codec: str, bit_depth: int = 8) -> str | None:
+        """Best usable encoder for ``codec``; hardware first when it can do ``bit_depth``."""
         for name in ENCODER_PREFERENCE.get(codec, ()):
-            if self.is_usable(name):
+            spec = VIDEO_ENCODERS[name]
+            if bit_depth in spec.bit_depths and self.is_usable(name, bit_depth):
                 return name
         return None
 
@@ -75,7 +83,9 @@ class Capabilities:
             "ffmpeg_version": self.ffmpeg_version,
             "hardware": {
                 "vaapi_device": self.vaapi_device,
+                "driver": self.vaapi_driver,
                 "encoders": sorted(self.usable_hw_encoders),
+                "ten_bit_encoders": sorted(self.usable_hw_10bit_encoders),
             },
             "video_encoders": video,
             "default_video_encoders": {
@@ -115,22 +125,41 @@ def _ffmpeg_version() -> str | None:
     return match.group(1) if match else None
 
 
-def _vaapi_test_encode(device: str, encoder: str) -> bool:
-    upload = "format=nv12,hwupload"
+def _vaapi_test_encode(device: str, encoder: str, bit_depth: int = 8) -> bool:
+    upload = "format=p010,hwupload" if bit_depth == 10 else "format=nv12,hwupload"
+    profile = ["-profile:v", "main10"] if bit_depth == 10 and encoder == "hevc_vaapi" else []
     result = _run(
         [
             FFMPEG_PATH, "-hide_banner", "-v", "error",
             "-vaapi_device", device,
             "-f", "lavfi", "-i", "color=c=black:s=256x256:d=0.2",
-            "-vf", upload, "-frames:v", "1", "-c:v", encoder,
+            "-vf", upload, "-frames:v", "1", "-c:v", encoder, *profile,
             "-f", "null", "-",
         ],
         timeout=20,
     )
     ok = result is not None and result.returncode == 0
     if not ok and result is not None:
-        logger.info("VAAPI encoder %s unusable on %s: %s", encoder, device, result.stderr.strip()[:300])
+        logger.info(
+            "VAAPI encoder %s (%d-bit) unusable on %s: %s",
+            encoder, bit_depth, device, result.stderr.strip()[:300],
+        )
     return ok
+
+
+def parse_vainfo_driver(output: str) -> str | None:
+    """Pull the driver description out of ``vainfo`` output."""
+    for line in output.splitlines():
+        if "Driver version:" in line:
+            return line.split("Driver version:", 1)[1].strip() or None
+    return None
+
+
+def _vaapi_driver(device: str) -> str | None:
+    result = _run(["vainfo", "--display", "drm", "--device", device], timeout=10)
+    if result is None:
+        return None
+    return parse_vainfo_driver(result.stdout + result.stderr)
 
 
 def detect_capabilities() -> Capabilities:
@@ -139,29 +168,46 @@ def detect_capabilities() -> Capabilities:
     compiled = parse_encoder_list(listing.stdout) if listing is not None and listing.returncode == 0 else frozenset()
 
     vaapi_device = None
+    vaapi_driver = None
     usable_hw: set[str] = set()
+    usable_hw_10bit: set[str] = set()
     hw_mode = (settings.hw_accel or "auto").lower()
-    if hw_mode in ("auto", "vaapi") and Path(settings.vaapi_device).exists():
+    device = settings.vaapi_device
+    if hw_mode in ("auto", "vaapi") and Path(device).exists():
         candidates = [
             name for name, spec in VIDEO_ENCODERS.items()
             if spec.hardware == "vaapi" and name in compiled
         ]
         for encoder in candidates:
-            if _vaapi_test_encode(settings.vaapi_device, encoder):
-                usable_hw.add(encoder)
+            if not _vaapi_test_encode(device, encoder):
+                continue
+            usable_hw.add(encoder)
+            if 10 in VIDEO_ENCODERS[encoder].bit_depths and _vaapi_test_encode(device, encoder, bit_depth=10):
+                usable_hw_10bit.add(encoder)
         if usable_hw:
-            vaapi_device = settings.vaapi_device
+            vaapi_device = device
+            vaapi_driver = _vaapi_driver(device)
+    if hw_mode == "vaapi" and not usable_hw:
+        logger.warning(
+            "HW_ACCEL=vaapi but no VAAPI encoder works on %s. Is /dev/dri passed into "
+            "the container and is a VA driver (e.g. mesa-va-drivers) installed?",
+            device,
+        )
 
     caps = Capabilities(
         ffmpeg_version=_ffmpeg_version(),
         compiled_encoders=compiled,
         vaapi_device=vaapi_device,
         usable_hw_encoders=frozenset(usable_hw),
+        usable_hw_10bit_encoders=frozenset(usable_hw_10bit),
+        vaapi_driver=vaapi_driver,
     )
     logger.info(
-        "Encoder capabilities: ffmpeg=%s, hw=%s, software=%s",
+        "Encoder capabilities: ffmpeg=%s, hw=%s (10-bit: %s, driver: %s), software=%s",
         caps.ffmpeg_version,
         sorted(caps.usable_hw_encoders) or "none",
+        sorted(caps.usable_hw_10bit_encoders) or "none",
+        caps.vaapi_driver or "n/a",
         sorted(n for n, s in VIDEO_ENCODERS.items() if not s.hardware and n in compiled),
     )
     return caps

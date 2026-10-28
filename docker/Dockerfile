@@ -12,6 +12,10 @@ RUN npm run build
 FROM python:3.13-slim
 
 ARG BUILD_VERSION="dev"
+# VA-API drivers for GPU video encoding. mesa-va-drivers covers AMD (radeonsi).
+# For Intel Quick Sync build with --build-arg VAAPI_DRIVERS="intel-media-va-driver".
+# Pass an empty string to leave hardware encoding out entirely.
+ARG VAAPI_DRIVERS="mesa-va-drivers"
 
 # https://github.com/kovidgoyal/calibre/releases
 ARG CALIBRE_VERSION="9.15.0"
@@ -50,6 +54,8 @@ RUN pip install --no-cache-dir --no-deps --force-reinstall "PyOpenGL==3.1.7"
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     ffmpeg \
+    ${VAAPI_DRIVERS} \
+    vainfo \
     ghostscript \
     inkscape \
     tesseract-ocr \
@@ -166,6 +172,8 @@ COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # Copy entrypoint script with executable permission
 COPY --chmod=755 docker/entrypoint.sh /app/entrypoint.sh
+# GPU encoding diagnostics: `docker compose exec transmute vaapi-check`
+COPY --chmod=755 docker/vaapi-check.sh /usr/local/bin/vaapi-check
 
 # Ensure copied application files are always traversable/readable regardless of host umask.
 RUN chmod -R a+rX /app/backend /app/frontend

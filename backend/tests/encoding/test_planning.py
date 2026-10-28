@@ -4,7 +4,7 @@ import os
 import pytest
 
 from encoding import EncodeOptions, EncodeOptionsError, plan_av_encode
-from encoding.capabilities import parse_encoder_list
+from encoding.capabilities import parse_encoder_list, parse_vainfo_driver
 from encoding.ffmpeg_args import build_commands
 from encoding.probe import AudioStreamInfo, MediaInfo, VideoStreamInfo, parse_probe
 from encoding.resolve import software_fallback_plan
@@ -57,6 +57,40 @@ def test_vaapi_hevc_10bit_command(cezanne_caps):
     assert _after(cmd, "-rc_mode") == "CQP"
     assert _after(cmd, "-qp") == "24"
     assert _after(cmd, "-profile:v") == "main10"
+
+
+def test_10bit_request_skips_gpu_without_main10(gpu_8bit_only_caps):
+    plan = plan_av_encode("mkv", _opts(video={"codec": "hevc", "bit_depth": 10}), gpu_8bit_only_caps)
+    assert plan.video.encoder == "libx265"
+    assert plan.vaapi_device is None
+    # 8-bit HEVC still goes to the GPU.
+    assert plan_av_encode("mkv", _opts(video={"codec": "hevc"}), gpu_8bit_only_caps).video.encoder == "hevc_vaapi"
+
+
+def test_explicit_gpu_10bit_without_main10_is_rejected(gpu_8bit_only_caps):
+    with pytest.raises(EncodeOptionsError, match="hevc_vaapi can't encode 10-bit video on this GPU. Encoders that can: libx265"):
+        plan_av_encode("mkv", _opts(video={"encoder": "hevc_vaapi", "bit_depth": 10}), gpu_8bit_only_caps)
+
+
+def test_capabilities_describe_hardware(cezanne_caps):
+    hardware = cezanne_caps.describe()["hardware"]
+    assert hardware["ten_bit_encoders"] == ["hevc_vaapi"]
+    assert hardware["driver"].startswith("Mesa Gallium driver")
+
+
+def test_parse_vainfo_driver():
+    output = """Trying display: drm
+libva info: VA-API version 1.22.0
+libva info: Trying to open /usr/lib/x86_64-linux-gnu/dri/radeonsi_drv_video.so
+vainfo: VA-API version: 1.22 (libva 2.22.0)
+vainfo: Driver version: Mesa Gallium driver 25.0.7-2+deb13u1 for AMD Radeon Graphics (radeonsi, renoir, LLVM 19.1.7, DRM 3.61, 6.12.48-amd64)
+vainfo: Supported profile and entrypoints
+      VAProfileHEVCMain               : VAEntrypointEncSlice
+"""
+    assert parse_vainfo_driver(output) == (
+        "Mesa Gallium driver 25.0.7-2+deb13u1 for AMD Radeon Graphics (radeonsi, renoir, LLVM 19.1.7, DRM 3.61, 6.12.48-amd64)"
+    )
+    assert parse_vainfo_driver("vaInitialize failed with error code -1") is None
 
 
 def test_crf_on_hardware_encoder_becomes_constant_qp(cezanne_caps):

@@ -22,6 +22,8 @@ So `{"compression_level": "max", "options": {"video": {"max_height": 720}}}` mea
 
 Every example below needs `Authorization: Bearer <api-key>`.
 
+GPU encoding setup (VAAPI on AMD and Intel) is covered in [vaapi.md](vaapi.md).
+
 ## Discover what this server can do
 
 ```bash
